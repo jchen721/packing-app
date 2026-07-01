@@ -1,0 +1,8 @@
+node_modules/
+uploads/
+outputs/
+worker_logs.json
+
+.DS_Store
+
+.env

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Packing App</title>
+</head>
+<body>
+  <h1>Packing Label Sorter</h1>
+
+  <p>Upload one or more shipping label + packing slip PDFs.</p>
+
+  <form action="/process" method="POST" enctype="multipart/form-data">
+    <input type="file" name="pdfs" accept=".pdf" multiple required />
+    <br><br>
+    <button type="submit">Process PDFs</button>
+  </form>
+</body>
+</html>

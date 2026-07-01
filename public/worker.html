@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Worker Packing App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    .top {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    select, button {
+      padding: 8px;
+      font-size: 16px;
+    }
+
+    .order {
+      border: 1px solid #ccc;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+    }
+
+    .done {
+      background: #e7ffe7;
+    }
+
+    .start {
+      background: #fff8dc;
+    }
+  </style>
+</head>
+<body>
+  <h1>Worker Packing App</h1>
+
+  <div class="top">
+    <label>Worker / Camera:</label>
+    <select id="worker">
+      <option>Ace 1</option>
+      <option>Ace 2</option>
+      <option>Ace 3</option>
+      <option>Ace 4</option>
+    </select>
+
+    <label>Group:</label>
+    <select id="groupFilter" onchange="renderOrders()">
+      <option value="ALL">All</option>
+      <option value="8x8x4">8x8x4</option>
+      <option value="8x8x8">8x8x8</option>
+      <option value="6_Box">6 Box</option>
+      <option value="11_Box">11 Box</option>
+      <option value="13_Box">13 Box</option>
+      <option value="16_Box">16 Box</option>
+      <option value="24_Box">24 Box</option>
+      <option value="Packs_Only">Packs Only</option>
+      <option value="Sleeved_Packs">Sleeved Packs</option>
+      <option value="Needs_Review">Needs Review</option>
+    </select>
+  </div>
+
+  <p id="status">Loading orders...</p>
+
+  <div id="orders"></div>
+
+  <script>
+    let orders = [];
+    let localStatus = {};
+
+    async function loadOrders() {
+      const res = await fetch("/latest-orders");
+      const data = await res.json();
+
+      orders = data.orders || [];
+
+      document.getElementById("status").innerText =
+        "Loaded " + orders.length + " orders" + (data.runId ? " from run " + data.runId : "");
+
+      renderOrders();
+    }
+
+    function renderOrders() {
+      const container = document.getElementById("orders");
+      const groupFilter = document.getElementById("groupFilter").value;
+
+      container.innerHTML = "";
+
+      const filtered = orders.filter(order => {
+        if (groupFilter === "ALL") return true;
+        return order.finalGroup === groupFilter;
+      });
+
+      filtered.sort((a, b) => {
+        return String(a.buyerNickname || "").localeCompare(String(b.buyerNickname || ""));
+      });
+
+      for (const order of filtered) {
+        const status = localStatus[order.orderId] || "";
+
+        const div = document.createElement("div");
+        div.className = "order " + status.toLowerCase();
+
+        div.innerHTML = `
+          <strong>${order.buyerNickname || "No nickname"}</strong><br>
+          Order ID: ${order.orderId}<br>
+          Group: ${order.finalGroup}<br>
+          Exact Box: ${order.exactPackingGroup}<br>
+          <button onclick="logAction('${order.orderId}', '${escapeText(order.buyerNickname)}', '${order.finalGroup}', 'START')">
+            Start
+          </button>
+          <button onclick="logAction('${order.orderId}', '${escapeText(order.buyerNickname)}', '${order.finalGroup}', 'DONE')">
+            Done
+          </button>
+          <button onclick="logAction('${order.orderId}', '${escapeText(order.buyerNickname)}', '${order.finalGroup}', 'ISSUE')">
+            Issue
+          </button>
+        `;
+
+        container.appendChild(div);
+      }
+    }
+
+    function escapeText(text) {
+      return String(text || "").replace(/'/g, "\\'");
+    }
+
+    async function logAction(orderId, buyerNickname, finalGroup, action) {
+      const worker = document.getElementById("worker").value;
+
+      await fetch("/worker-log", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          worker,
+          action,
+          orderId,
+          buyerNickname,
+          finalGroup
+        })
+      });
+
+      localStatus[orderId] = action;
+      renderOrders();
+
+      alert(action + " logged for " + buyerNickname);
+    }
+
+    loadOrders();
+  </script>
+</body>
+</html>
