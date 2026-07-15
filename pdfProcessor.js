@@ -1,3 +1,4 @@
+
 const fs = require("fs");
 const path = require("path");
 const { PDFParse } = require("pdf-parse");
@@ -7,7 +8,7 @@ let archiver = require("archiver");
 if (archiver.default) archiver = archiver.default;
 
 const { classifyProduct, chooseBox } = require("./boxEngine");
-
+const { updatePickingChecklist } = require("./pickingChecklist");
 function cleanText(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
@@ -450,11 +451,14 @@ async function processPDFs(filePaths) {
       `Verification failed. Input pages: ${verification.totalInputPages}, Output pages: ${verification.totalOutputPages}, Expected pages: ${verification.expectedOutputPages}. Missing pages: ${verification.missingPages.length}, Duplicate pages: ${verification.duplicatePages.length}`
     );
   }
-
+  
+  // Update the Google Sheet
+  await updatePickingChecklist(itemCountsPhysical);
+  
   const zipPath = path.join("outputs", `packing_output_${runId}.zip`);
-
+  
   await createZip(outputDir, zipPath);
-
+  
   return {
     zipPath,
     summary

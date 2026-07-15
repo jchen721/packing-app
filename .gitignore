@@ -6,3 +6,5 @@ worker_logs.json
 .DS_Store
 
 .env
+
+google-service-account.json
