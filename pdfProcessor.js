@@ -8,6 +8,7 @@ if (archiver.default) archiver = archiver.default;
 
 const { classifyProduct, chooseBox } = require("./boxEngine");
 const { updatePickingChecklist } = require("./pickingChecklist");
+const { createBatchManifest, saveBatchFiles } = require("./batchService");
 
 function cleanText(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
@@ -79,8 +80,10 @@ function countCategories(products) {
     tins: 0,
     posters: 0,
     pokemonDays: 0,
+    firstPartners: 0,
     megaItems: 0,
     largePremiums: 0,
+    boosterBoxes: 0,
     deluxePin: 0,
     box24: 0,
     unknown: 0
@@ -107,6 +110,7 @@ function getFinalGroup(exactGroup) {
   if (exactGroup === "8x8x8") return "8x8x8";
 
   if (exactGroup.startsWith("6x")) return "6_Box";
+  if (exactGroup.startsWith("7x")) return "6_Box";
   if (exactGroup.startsWith("11x")) return "11_Box";
   if (exactGroup.startsWith("13x")) return "13_Box";
   if (exactGroup.startsWith("16x")) return "16_Box";
@@ -463,14 +467,24 @@ async function processPDFs(filePaths) {
     );
   }
 
-  // Update the Google Sheet only after verification passes
-  await updatePickingChecklist(
-    itemCountsPhysical
-  );
-
   const zipPath = path.join(
     "outputs",
     `packing_output_${runId}.zip`
+  );
+
+  const manifest = createBatchManifest({
+    runId,
+    orders: allOrders,
+    summary,
+    verification,
+    zipPath
+  });
+
+  saveBatchFiles(outputDir, manifest, allOrders);
+
+  // Update the Google Sheet only after verification passes
+  await updatePickingChecklist(
+    itemCountsPhysical
   );
 
   await createZip(
@@ -480,10 +494,12 @@ async function processPDFs(filePaths) {
 
   return {
     zipPath,
-    summary
+    summary,
+    batch: manifest.batch
   };
 }
 
 module.exports = {
-  processPDFs
+  processPDFs,
+  getFinalGroup
 };

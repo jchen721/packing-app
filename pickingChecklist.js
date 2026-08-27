@@ -1,15 +1,13 @@
-const path = require("path");
 const { google } = require("googleapis");
+const config = require("./appConfig");
+const { DEFAULT_SCHEMAS } = require("./googleSheetsSchema");
 
-const SPREADSHEET_ID =
-  "18rq0z5nE5KCsHKGCY6al-UMXmpceN5c5LXZ3tA8ejGA";
+const SPREADSHEET_ID = config.spreadsheetId;
 
 const SHEET_NAME = "packing List";
+const HEADERS = DEFAULT_SCHEMAS[SHEET_NAME];
 
-const SERVICE_ACCOUNT_FILE = path.join(
-  __dirname,
-  "google-service-account.json"
-);
+const SERVICE_ACCOUNT_FILE = config.credentialsFile;
 
 function prepareRows(itemCountsPhysical) {
   if (!itemCountsPhysical || typeof itemCountsPhysical !== "object") {
@@ -99,7 +97,7 @@ async function updatePickingChecklist(itemCountsPhysical) {
   });
 
   const values = [
-    ["ITEM", "QUANTITY", "CHECKLIST"],
+    HEADERS,
     ...rows
   ];
 
@@ -178,5 +176,7 @@ async function updatePickingChecklist(itemCountsPhysical) {
 }
 
 module.exports = {
+  SHEET_NAME,
+  HEADERS,
   updatePickingChecklist
 };

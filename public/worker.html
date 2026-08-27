@@ -10,12 +10,13 @@
 
     .top {
       display: flex;
+      flex-wrap: wrap;
       gap: 15px;
       align-items: center;
       margin-bottom: 20px;
     }
 
-    select, button {
+    select, button, input {
       padding: 8px;
       font-size: 16px;
     }
@@ -62,37 +63,74 @@
       <option value="Sleeved_Packs">Sleeved Packs</option>
       <option value="Needs_Review">Needs Review</option>
     </select>
+
+    <label>Status:</label>
+    <select id="statusFilter" onchange="renderOrders()">
+      <option value="ALL">All</option>
+      <option value="NOT_STARTED">Not started</option>
+      <option value="START">Started</option>
+      <option value="DONE">Done</option>
+      <option value="ISSUE">Issue</option>
+    </select>
+
+    <input id="orderSearch" type="search" placeholder="Search buyer or order ID" oninput="renderOrders()">
+    <button type="button" onclick="loadOrders()">Refresh</button>
   </div>
 
   <p id="status">Loading orders...</p>
+  <p id="progress"></p>
 
   <div id="orders"></div>
 
   <script>
     let orders = [];
     let localStatus = {};
+    let currentBatchId = "";
+    let actionSaving = false;
+
+    const workerSelect = document.getElementById("worker");
+    const savedWorker = localStorage.getItem("acePackingWorker");
+    if (savedWorker && [...workerSelect.options].some(option => option.value === savedWorker)) workerSelect.value = savedWorker;
+    workerSelect.addEventListener("change", () => localStorage.setItem("acePackingWorker", workerSelect.value));
 
     async function loadOrders() {
-      const res = await fetch("/latest-orders");
-      const data = await res.json();
-
-      orders = data.orders || [];
-
-      document.getElementById("status").innerText =
-        "Loaded " + orders.length + " orders" + (data.runId ? " from run " + data.runId : "");
-
-      renderOrders();
+      const status = document.getElementById("status");
+      try {
+        const res = await fetch("/latest-orders");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not load orders.");
+        orders = data.orders || [];
+        currentBatchId = data.batchId || "";
+        localStatus = {};
+        let activityMessage = "";
+        if (currentBatchId) {
+          const activityResponse = await fetch(`/worker-logs?batchId=${encodeURIComponent(currentBatchId)}`);
+          const activity = await activityResponse.json();
+          if (!activityResponse.ok) throw new Error(activity.error || "Could not load worker activity.");
+          for (const log of activity.logs || []) localStatus[String(log.orderId || "")] = log.action;
+          activityMessage = activity.warning ? ` ${activity.warning}` : " Shared worker activity connected.";
+        }
+        status.textContent = `Loaded ${orders.length} orders${data.runId ? ` from run ${data.runId}` : ""}.${activityMessage}`;
+        renderOrders();
+      } catch (error) {
+        status.textContent = error.message;
+      }
     }
 
     function renderOrders() {
       const container = document.getElementById("orders");
       const groupFilter = document.getElementById("groupFilter").value;
+      const statusFilter = document.getElementById("statusFilter").value;
+      const search = document.getElementById("orderSearch").value.trim().toLowerCase();
 
-      container.innerHTML = "";
+      container.replaceChildren();
 
       const filtered = orders.filter(order => {
-        if (groupFilter === "ALL") return true;
-        return order.finalGroup === groupFilter;
+        const action = localStatus[order.orderId] || "NOT_STARTED";
+        const matchesGroup = groupFilter === "ALL" || order.finalGroup === groupFilter;
+        const matchesStatus = statusFilter === "ALL" || action === statusFilter;
+        const matchesSearch = !search || [order.buyerNickname, order.orderId].some(value => String(value || "").toLowerCase().includes(search));
+        return matchesGroup && matchesStatus && matchesSearch;
       });
 
       filtered.sort((a, b) => {
@@ -105,54 +143,70 @@
         const div = document.createElement("div");
         div.className = "order " + status.toLowerCase();
 
-        div.innerHTML = `
-          <strong>${order.buyerNickname || "No nickname"}</strong><br>
-          Order ID: ${order.orderId}<br>
-          Group: ${order.finalGroup}<br>
-          Exact Box: ${order.exactPackingGroup}<br>
-          <button onclick="logAction('${order.orderId}', '${escapeText(order.buyerNickname)}', '${order.finalGroup}', 'START')">
-            Start
-          </button>
-          <button onclick="logAction('${order.orderId}', '${escapeText(order.buyerNickname)}', '${order.finalGroup}', 'DONE')">
-            Done
-          </button>
-          <button onclick="logAction('${order.orderId}', '${escapeText(order.buyerNickname)}', '${order.finalGroup}', 'ISSUE')">
-            Issue
-          </button>
-        `;
+        const name = document.createElement("strong");
+        name.textContent = cleanDisplayText(order.buyerNickname) || "No nickname";
+        div.appendChild(name);
+
+        for (const text of [
+          `Order ID: ${order.orderId || ""}`,
+          `Group: ${order.finalGroup || ""}`,
+          `Exact Box: ${order.exactPackingGroup || ""}`
+        ]) {
+          div.appendChild(document.createElement("br"));
+          div.appendChild(document.createTextNode(text));
+        }
+        div.appendChild(document.createElement("br"));
+
+        for (const action of ["START", "DONE", "ISSUE"]) {
+          const button = document.createElement("button");
+          button.textContent = action[0] + action.slice(1).toLowerCase();
+          button.addEventListener("click", () => logAction(
+            order.orderId,
+            order.buyerNickname,
+            order.finalGroup,
+            action
+          ));
+          div.appendChild(button);
+        }
 
         container.appendChild(div);
       }
+
+      const counts = { START: 0, DONE: 0, ISSUE: 0 };
+      for (const order of orders) { const action = localStatus[order.orderId]; if (counts[action] !== undefined) counts[action] += 1; }
+      document.getElementById("progress").textContent = `Showing ${filtered.length} of ${orders.length} · Done ${counts.DONE} · Started ${counts.START} · Issues ${counts.ISSUE} · Not started ${Math.max(0, orders.length - counts.DONE - counts.START - counts.ISSUE)}`;
     }
 
-    function escapeText(text) {
-      return String(text || "").replace(/'/g, "\\'");
+    function cleanDisplayText(value) {
+      return String(value || "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim();
     }
 
     async function logAction(orderId, buyerNickname, finalGroup, action) {
       const worker = document.getElementById("worker").value;
-
-      await fetch("/worker-log", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          worker,
-          action,
-          orderId,
-          buyerNickname,
-          finalGroup
-        })
-      });
-
-      localStatus[orderId] = action;
-      renderOrders();
-
-      alert(action + " logged for " + buyerNickname);
+      const status = document.getElementById("status");
+      if (!currentBatchId) { status.textContent = "No active packing batch is loaded."; return; }
+      actionSaving = true;
+      status.textContent = `Saving ${action.toLowerCase()} for ${buyerNickname || orderId}…`;
+      try {
+        const response = await fetch("/worker-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ batchId: currentBatchId, worker, action, orderId, buyerNickname, finalGroup })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not save worker activity.");
+        localStatus[orderId] = action;
+        renderOrders();
+        status.textContent = `${action} saved for ${buyerNickname || orderId} by ${worker}.`;
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        actionSaving = false;
+      }
     }
 
     loadOrders();
+    setInterval(() => { if (!document.hidden && !actionSaving) loadOrders(); }, 20000);
   </script>
 </body>
 </html>

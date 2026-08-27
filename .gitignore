@@ -1,10 +1,27 @@
 node_modules/
 uploads/
 outputs/
+tmp/
 worker_logs.json
+processedBatches.json
+
+# Legacy/local source material must not enter production commits.
+/sample.pdf
+/inventory.xlsx
+/orders.json
+/groupedOrders.json
+/itemCounts.json
+/itemCountsPhysical.json
+
+# Unrelated project stored beside this repository.
+/rent-portal/
 
 .DS_Store
 
 .env
 
 google-service-account.json
+.tiktok-token-store.json
+.codex-checkpoints/
+.checkpoints/
+inventory_receipts/

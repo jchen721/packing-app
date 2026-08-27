@@ -1,17 +1,451 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <title>Packing App</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ace Collectibles Packing & Inventory</title>
+  <style>
+    :root { color-scheme: light; --blue:#2356d8; --ink:#172033; --muted:#667085; --line:#dde3ed; --surface:#fff; --background:#f5f7fb; --success:#13743d; --danger:#b42318; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--background); color:var(--ink); font:16px/1.45 Arial,sans-serif; }
+    header { background:#13254a; color:#fff; padding:24px max(20px,calc((100% - 1120px)/2)); }
+    header h1 { margin:0 0 4px; font-size:1.65rem; }
+    header p { margin:0; color:#d6def0; }
+    nav { max-width:1120px; margin:0 auto; padding:16px 20px 0; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    nav button { background:#e7ecf7; color:var(--ink); }
+    nav button.active { background:var(--blue); color:#fff; }
+    nav a { margin-left:auto; color:var(--blue); font-weight:700; }
+    main { max-width:1120px; margin:0 auto; padding:4px 20px 60px; }
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:22px; margin:18px 0; box-shadow:0 3px 12px rgba(20,35,60,.05); overflow-x:auto; }
+    .card h2 { margin-top:0; }
+    .note { background:#eef3ff; border-left:4px solid var(--blue); padding:12px 14px; border-radius:6px; }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+    .stat { background:#f2f5fa; border-radius:8px; padding:14px; }
+    .stat strong { display:block; margin-top:5px; font-size:1.45rem; }
+    .actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; }
+    button,.button { border:0; border-radius:7px; padding:11px 16px; background:var(--blue); color:#fff; font-weight:700; cursor:pointer; text-decoration:none; display:inline-block; }
+    button.secondary,.button.secondary { background:#e7ecf7; color:var(--ink); }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    input,select { border:1px solid #b9c3d4; border-radius:7px; padding:10px; font:inherit; }
+    input[type=file] { background:#fff; max-width:100%; }
+    table { width:100%; min-width:580px; border-collapse:collapse; margin-top:8px; }
+    th,td { padding:10px; text-align:left; border-bottom:1px solid #e5e9f0; vertical-align:top; }
+    th { color:#4d5870; font-size:.9rem; }
+    .success { color:var(--success); }
+    .error { color:var(--danger); }
+    .receipt-row { display:grid; grid-template-columns:minmax(220px,1fr) 120px auto; gap:10px; margin:10px 0; }
+    [hidden] { display:none !important; }
+    @media (max-width:700px) { .receipt-row { grid-template-columns:1fr; } nav a { margin-left:0; width:100%; } }
+  </style>
 </head>
 <body>
-  <h1>Packing Label Sorter</h1>
+  <header>
+    <h1>Ace Collectibles Packing & Inventory</h1>
+    <p>Process orders, review deductions, and keep warehouse quantities synchronized.</p>
+  </header>
+  <nav aria-label="Application sections">
+    <button type="button" class="active" data-section="packing">Packing</button>
+    <button type="button" data-section="inventory">Inventory</button>
+    <a href="/worker.html">Open worker packing screen</a>
+  </nav>
 
-  <p>Upload one or more shipping label + packing slip PDFs.</p>
+  <main id="packing">
+    <section class="card note">
+      <strong id="operatingMode">Packing-only mode</strong>
+      <div id="operatingModeMessage">Packing files can be generated, but permanent inventory changes are disabled until the warehouse starting count is verified.</div>
+    </section>
+    <section class="card">
+      <h2>Process packing PDFs</h2>
+      <p>Select one or more order PDFs. The original extraction, verification, box selection, grouped PDFs, ZIP generation, and packing-list update remain active.</p>
+      <form id="uploadForm" class="actions">
+        <input id="pdfFiles" type="file" name="pdfs" accept=".pdf,application/pdf" multiple required>
+        <button id="processButton" type="submit">Process PDFs</button>
+      </form>
+      <p id="packingMessage" role="status"></p>
+    </section>
 
-  <form action="/process" method="POST" enctype="multipart/form-data">
-    <input type="file" name="pdfs" accept=".pdf" multiple required />
-    <br><br>
-    <button type="submit">Process PDFs</button>
-  </form>
+    <section id="review" class="card" hidden>
+      <h2>Review inventory deduction</h2>
+      <div id="reviewStats" class="stats"></div>
+      <h3>Products used</h3><div id="products"></div>
+      <h3>Shipping boxes used</h3><div id="boxes"></div>
+      <h3>Proposed inventory deductions</h3><div id="deductions"></div>
+      <h3>Current Google Sheets inventory check</h3>
+      <div id="availability"></div>
+      <p id="availabilityMessage" role="status"></p>
+      <div class="actions">
+        <a id="download" class="button secondary">Download Packing Files</a>
+        <div id="inventoryConfirmationControls" class="actions" hidden>
+          <input id="confirmationUser" placeholder="Your name" autocomplete="name">
+          <button id="confirm" type="button">Confirm Inventory Deduction</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="receiptSection" class="card" hidden>
+      <div class="actions"><h2 style="margin:0">Recent packing batches</h2><button id="refreshBatches" type="button" class="secondary">Refresh</button></div>
+      <p>Repeated PDFs remain protected by the shared batch and order records.</p>
+      <div id="batchTable"></div>
+      <p id="batchMessage" role="status"></p>
+    </section>
+  </main>
+
+  <main id="inventory" hidden>
+    <section class="card">
+      <h2>Current inventory</h2>
+      <p class="note">Google Sheets is the editable source of truth. This screen is read-only and refreshes the latest quantities from the Inventory and Warehouse Supplies tabs.</p>
+      <div class="actions"><button id="refreshInventory" type="button" class="secondary">Refresh inventory</button></div>
+      <div id="inventoryStats" class="stats"></div>
+      <div id="inventoryTable"></div>
+      <p id="inventoryMessage" role="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>Receive existing inventory</h2>
+      <p>Use this only after an item already exists in the correct Google Sheets inventory tab. Nothing changes until you review and confirm.</p>
+      <div id="receiptRows"></div>
+      <button id="addReceiptRow" type="button" class="secondary">Add item</button>
+      <div class="actions">
+        <input id="receiptUser" placeholder="Your name" autocomplete="name">
+        <input id="receiptReason" value="Warehouse inventory received" placeholder="Reason">
+        <button id="previewReceipt" type="button">Review receipt</button>
+      </div>
+      <div id="receiptPreview"></div>
+      <button id="confirmReceipt" type="button" hidden>Confirm Inventory Receipt</button>
+      <p id="receiptMessage" role="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>Recent inventory changes</h2>
+      <div id="historyTable"></div>
+      <p id="historyMessage" role="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>Connections</h2>
+      <div id="connectionStats" class="stats"></div>
+      <p id="connectionMessage" role="status"></p>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+    let currentBatchId = null;
+    let inventoryItems = [];
+    let receiptId = null;
+    let inventoryWritesEnabled = false;
+
+    function setStatus(element, text, type = "") {
+      element.textContent = text;
+      element.className = type;
+    }
+
+    function makeTable(target, headers, rows) {
+      target.replaceChildren();
+      if (!rows.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "No records yet.";
+        target.appendChild(empty);
+        return;
+      }
+      const table = document.createElement("table");
+      const head = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      for (const label of headers) {
+        const th = document.createElement("th");
+        th.textContent = label;
+        headerRow.appendChild(th);
+      }
+      head.appendChild(headerRow);
+      table.appendChild(head);
+      const body = document.createElement("tbody");
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        for (const value of row) {
+          const td = document.createElement("td");
+          if (value instanceof Node) td.appendChild(value);
+          else td.textContent = String(value ?? "—");
+          tr.appendChild(td);
+        }
+        body.appendChild(tr);
+      }
+      table.appendChild(body);
+      target.appendChild(table);
+    }
+
+    function makeStats(target, values) {
+      target.replaceChildren();
+      for (const [label, value] of values) {
+        const card = document.createElement("div");
+        card.className = "stat";
+        const caption = document.createElement("span");
+        caption.textContent = label;
+        const strong = document.createElement("strong");
+        strong.textContent = String(value);
+        card.append(caption, strong);
+        target.appendChild(card);
+      }
+    }
+
+    function itemRows(items) {
+      return (items || []).map(item => [item.item, item.quantity]);
+    }
+
+    function renderReview(data) {
+      currentBatchId = data.batchId;
+      makeStats(document.getElementById("reviewStats"), [
+        ["Total orders", data.totalOrders],
+        ["Processed pages", data.processedPages],
+        ["Needs review", data.ordersNeedingReview]
+      ]);
+      makeTable(document.getElementById("products"), ["Item", "Quantity"], itemRows(data.products));
+      makeTable(document.getElementById("boxes"), ["Item", "Quantity"], itemRows(data.boxes));
+      makeTable(document.getElementById("deductions"), ["Item", "Quantity"], itemRows(data.proposedDeductions));
+      makeTable(document.getElementById("availability"), ["Item", "Category", "Current", "Deduction", "After", "Status"],
+        (data.inventoryAvailability || []).map(row => [row.item, row.category, row.currentQuantity ?? "Missing", row.quantity, row.newQuantity ?? "—", row.status]));
+      const availability = document.getElementById("availabilityMessage");
+      if (!inventoryWritesEnabled) {
+        setStatus(availability, "Review only: no inventory will be deducted in packing-only mode.", "success");
+      } else {
+        setStatus(availability,
+          data.inventoryValidationError || (data.inventoryReady ? "Every proposed deduction is available." : "Correct missing names or quantities in Google Sheets before confirming."),
+          data.inventoryReady ? "success" : "error");
+      }
+      document.getElementById("download").href = `/batches/${data.batchId}/download`;
+      const confirm = document.getElementById("confirm");
+      confirm.disabled = data.alreadyProcessed || data.inventoryReady === false;
+      confirm.textContent = data.alreadyProcessed ? "Inventory Already Deducted" : data.inventoryReady === false ? "Resolve Inventory Issues" : "Confirm Inventory Deduction";
+      document.getElementById("review").hidden = false;
+    }
+
+    document.querySelectorAll("nav button[data-section]").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("nav button[data-section]").forEach(tab => tab.classList.toggle("active", tab === button));
+        document.getElementById("packing").hidden = button.dataset.section !== "packing";
+        document.getElementById("inventory").hidden = button.dataset.section !== "inventory";
+        if (button.dataset.section === "inventory") Promise.all([loadInventory(), loadHistory(), loadConnections()]);
+      });
+    });
+
+    document.getElementById("uploadForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = document.getElementById("processButton");
+      const message = document.getElementById("packingMessage");
+      button.disabled = true;
+      document.getElementById("review").hidden = true;
+      setStatus(message, "Processing and verifying PDFs…");
+      try {
+        const response = await fetch("/process", { method: "POST", body: new FormData(form) });
+        if (!response.ok) throw new Error(await response.text());
+        const result = await response.json();
+        const reviewResponse = await fetch(result.reviewUrl);
+        const review = await reviewResponse.json();
+        if (!reviewResponse.ok) throw new Error(review.error || "Could not load the batch review.");
+        renderReview(review);
+        setStatus(message, "Batch created. Review deductions before confirming.", "success");
+        await loadBatches();
+      } catch (error) {
+        setStatus(message, error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    document.getElementById("confirm").addEventListener("click", async event => {
+      const user = document.getElementById("confirmationUser").value.trim();
+      const message = document.getElementById("packingMessage");
+      if (!user) return setStatus(message, "Enter your name before confirming.", "error");
+      event.currentTarget.disabled = true;
+      setStatus(message, "Updating Google Sheets inventory…");
+      try {
+        const response = await fetch(`/batches/${currentBatchId}/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Inventory confirmation failed.");
+        event.currentTarget.textContent = "Inventory Deducted";
+        setStatus(message, "Inventory deduction confirmed and recorded.", "success");
+        await Promise.all([loadBatches(), loadInventory(), loadHistory()]);
+      } catch (error) {
+        event.currentTarget.disabled = false;
+        setStatus(message, error.message, "error");
+      }
+    });
+
+    async function loadBatches() {
+      const message = document.getElementById("batchMessage");
+      setStatus(message, "Loading packing batches…");
+      try {
+        const response = await fetch("/packing-batches");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not load batches.");
+        const rows = data.batches.slice(0, 15).map(batch => {
+          const link = document.createElement("a");
+          link.className = "button secondary";
+          link.href = `/batches/${batch.batchId}/download`;
+          link.textContent = "Download";
+          return [batch.createdAt ? new Date(batch.createdAt).toLocaleString() : "—", batch.batchId.slice(0, 12), batch.totalOrders, batch.ordersNeedingReview, batch.status, batch.confirmedBy || "—", batch.downloadAvailable ? link : "Unavailable"];
+        });
+        makeTable(document.getElementById("batchTable"), ["Created", "Batch ID", "Orders", "Review", "Status", "Confirmed by", "Files"], rows);
+        setStatus(message, data.warning || `${data.batches.length} unique batches. Shared duplicate protection ${data.sharedRegistryConnected ? "connected" : "temporarily unavailable"}.`, data.warning ? "error" : "success");
+      } catch (error) {
+        setStatus(message, error.message, "error");
+      }
+    }
+
+    async function loadInventory() {
+      const message = document.getElementById("inventoryMessage");
+      setStatus(message, "Loading Google Sheets inventory…");
+      try {
+        const response = await fetch("/inventory");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not load inventory.");
+        inventoryItems = data.items || [];
+        makeStats(document.getElementById("inventoryStats"), [["Items", data.totalItems], ["Total units", data.totalUnits], ["Low stock", data.lowStockItems], ["Out of stock", data.outOfStockItems]]);
+        makeTable(document.getElementById("inventoryTable"), ["Item", "Category", "Quantity", "Low-stock level", "Reorder amount", "Status"],
+          inventoryItems.map(item => [item.item, item.category, item.quantity, item.lowStockLevel, item.reorderAmount, item.stockStatus]));
+        refreshReceiptSelectors();
+        setStatus(message, `Inventory refreshed ${new Date().toLocaleTimeString()}.`, "success");
+      } catch (error) {
+        setStatus(message, error.message, "error");
+      }
+    }
+
+    function addReceiptRow() {
+      const row = document.createElement("div");
+      row.className = "receipt-row";
+      const select = document.createElement("select");
+      select.className = "receipt-item";
+      const quantity = document.createElement("input");
+      quantity.className = "receipt-quantity";
+      quantity.type = "number";
+      quantity.min = "1";
+      quantity.step = "1";
+      quantity.placeholder = "Quantity";
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "secondary";
+      remove.textContent = "Remove";
+      remove.addEventListener("click", () => row.remove());
+      row.append(select, quantity, remove);
+      document.getElementById("receiptRows").appendChild(row);
+      populateReceiptSelect(select);
+    }
+
+    function populateReceiptSelect(select) {
+      const selected = select.value;
+      select.replaceChildren();
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = inventoryItems.length ? "Choose an existing item" : "Load inventory first";
+      select.appendChild(placeholder);
+      for (const item of inventoryItems) {
+        const option = document.createElement("option");
+        option.value = item.item;
+        option.textContent = `${item.item} · ${item.category}`;
+        select.appendChild(option);
+      }
+      if ([...select.options].some(option => option.value === selected)) select.value = selected;
+    }
+
+    function refreshReceiptSelectors() {
+      document.querySelectorAll(".receipt-item").forEach(populateReceiptSelect);
+    }
+
+    document.getElementById("addReceiptRow").addEventListener("click", addReceiptRow);
+    document.getElementById("previewReceipt").addEventListener("click", async () => {
+      const message = document.getElementById("receiptMessage");
+      const rows = [...document.querySelectorAll(".receipt-row")].map(row => ({
+        item: row.querySelector(".receipt-item").value,
+        quantity: Number(row.querySelector(".receipt-quantity").value)
+      })).filter(item => item.item || item.quantity);
+      setStatus(message, "Preparing receipt review…");
+      try {
+        const response = await fetch("/inventory/receive/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: rows, user: document.getElementById("receiptUser").value, reason: document.getElementById("receiptReason").value })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not prepare the receipt.");
+        receiptId = data.receiptId;
+        makeTable(document.getElementById("receiptPreview"), ["Item", "Previous", "Received", "New quantity"], data.items.map(item => [item.item, item.previousQuantity, item.quantity, item.newQuantity]));
+        document.getElementById("confirmReceipt").hidden = false;
+        setStatus(message, "Review these increases, then confirm.", "success");
+      } catch (error) {
+        receiptId = null;
+        document.getElementById("confirmReceipt").hidden = true;
+        setStatus(message, error.message, "error");
+      }
+    });
+
+    document.getElementById("confirmReceipt").addEventListener("click", async event => {
+      const message = document.getElementById("receiptMessage");
+      event.currentTarget.disabled = true;
+      setStatus(message, "Updating Google Sheets inventory…");
+      try {
+        const response = await fetch(`/inventory/receive/${receiptId}/confirm`, { method: "POST" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not confirm the receipt.");
+        event.currentTarget.hidden = true;
+        receiptId = null;
+        setStatus(message, "Inventory receipt confirmed and recorded.", "success");
+        await Promise.all([loadInventory(), loadHistory()]);
+      } catch (error) {
+        event.currentTarget.disabled = false;
+        setStatus(message, error.message, "error");
+      }
+    });
+
+    async function loadHistory() {
+      const message = document.getElementById("historyMessage");
+      try {
+        const response = await fetch("/inventory-history?limit=50");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not load inventory history.");
+        makeTable(document.getElementById("historyTable"), ["Time", "Item", "Category", "Change", "Previous", "New", "Action", "User"],
+          data.history.map(row => [row.timestamp ? new Date(row.timestamp).toLocaleString() : "—", row.item, row.category, row.quantityChanged, row.previousQuantity, row.newQuantity, row.actionType, row.user]));
+        setStatus(message, `${data.history.length} recent inventory changes.`, "success");
+      } catch (error) {
+        setStatus(message, error.message, "error");
+      }
+    }
+
+    async function loadConnections() {
+      const message = document.getElementById("connectionMessage");
+      try {
+        const response = await fetch("/system/status");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.googleSheets?.error || "Could not verify connections.");
+        inventoryWritesEnabled = data.inventoryWritesEnabled === true;
+        document.getElementById("inventoryConfirmationControls").hidden = !inventoryWritesEnabled;
+        document.getElementById("receiptSection").hidden = !inventoryWritesEnabled;
+        document.getElementById("operatingMode").textContent = inventoryWritesEnabled ? "Packing and inventory mode" : "Packing-only mode";
+        document.getElementById("operatingModeMessage").textContent = inventoryWritesEnabled
+          ? "Confirmed packing runs and receipts can update inventory."
+          : "Packing files can be generated, but permanent inventory changes are disabled until the warehouse starting count is verified.";
+        const schemaReady = (data.googleSheets.schemaValidation || []).filter(row => row.ready).length;
+        makeStats(document.getElementById("connectionStats"), [
+          ["Google Sheets", data.googleSheets.connected ? "Connected" : "Unavailable"],
+          ["Required tabs", `${schemaReady}/${data.googleSheets.schemaValidation.length}`],
+          ["Supabase records", data.supabase?.status || "Disabled"],
+          ["Active areas", "Packing + Inventory"]
+        ]);
+        setStatus(message, inventoryWritesEnabled
+          ? "Packing and inventory writes are active."
+          : "Packing-only mode is active. Inventory additions and deductions are blocked by the server.", "success");
+      } catch (error) {
+        setStatus(message, error.message, "error");
+      }
+    }
+
+    document.getElementById("refreshBatches").addEventListener("click", loadBatches);
+    document.getElementById("refreshInventory").addEventListener("click", () => Promise.all([loadInventory(), loadHistory()]));
+    addReceiptRow();
+    Promise.all([loadBatches(), loadConnections()]);
+  </script>
 </body>
 </html>
