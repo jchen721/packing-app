@@ -60,3 +60,20 @@ test("inventory usage removes decorative symbols from Chaos Rising pack aliases"
   ] }]);
   assert.deepEqual(usage, { "Chaos Rising Packs": 7 });
 });
+
+test("TikTok spelling variants normalize to approved canonical inventory names", () => {
+  const usage = buildInventoryUsageFromOrders([{ products: [
+    { productName: "First Partner - Series 3 Collection", physicalQty: 8 },
+    { productName: "First Partner Illustration Collection (Series 3)", physicalQty: 19 },
+    { productName: "Random Booster Pack (CN) x1", physicalQty: 30 },
+    { productName: "Random Chinese Booster Pack", physicalQty: 12 },
+    { productName: "Random Chinese Booster Pack x1", physicalQty: 7 },
+    { productName: "x1 Random Booster Pack (CN)", physicalQty: 43 },
+    { productName: "Pitch Black [Booster Pack] x1", physicalQty: 3 }
+  ] }]);
+  assert.deepEqual(usage, {
+    "First Partner Series 3 Collection": 27,
+    "Random Booster Pack (JP/KR/CN)": 92,
+    "Pitch Black Booster Pack": 3
+  });
+});

@@ -1767,3 +1767,5 @@ These clarifications were supplied after the original master specification:
 7. Ascended Heroes Focused Fighters Premium Collection uses the 24-series family, matching Blooming Waters 151 and Paldean Fates Great Tusk.
 
 8. The downloadable worker ZIP contains only the grouped PDFs that need to be printed. Internal batch JSON remains in the private run directory. After verification passes, physical item totals continue to update the Google Sheets packing List with unchecked checklist boxes.
+
+9. TikTok product-name variants that represent the same physical item must be combined before writing the picking checklist or inventory usage. Preserve raw names in batch audit data. Approved canonical mappings include both First Partner Series 3 names in one row, all Random Chinese/CN/JP/KR Booster Pack variants in one row, and Pitch Black Booster Pack bracket/x1 variants in one row. AI may recommend future mappings, but a manager must approve them before automatic merging.

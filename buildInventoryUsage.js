@@ -48,7 +48,12 @@ const PRODUCT_NAME_MAP = {
 function normalizeProductName(originalName) {
   const cleaned = String(originalName || "").trim().replace(/\s+/g, " ");
   const comparable = cleaned.normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-  if (/\brandom\s+booster\s+pack\b/i.test(comparable)) return "Random Booster Pack (JP/KR/CN)";
+  if (/\brandom(?:\s+(?:chinese|japanese|korean))?\s+booster\s+pack\b/i.test(comparable)) return "Random Booster Pack (JP/KR/CN)";
+  if (
+    /\bfirst\s+partner\s+illustration\s+collection(?:\s+series\s+3)?\b/i.test(comparable) ||
+    /\bfirst\s+partner\s+series\s+3\s+collection\b/i.test(comparable)
+  ) return "First Partner Series 3 Collection";
+  if (/\bpitch\s+black\s+booster\s+pack\b/i.test(comparable)) return "Pitch Black Booster Pack";
   if (/\bgem(?:\s+vol)?\s*4(?:\s+booster)?\s+pack(?:\s+x1)?\b/i.test(comparable)) return "Gem Packs";
   if (/\bchaos\s+rising(?:\s+english)?\s+booster\s+pack(?:\s+x1)?\b/i.test(comparable)) return "Chaos Rising Packs";
   const match = Object.entries(PRODUCT_NAME_MAP).find(

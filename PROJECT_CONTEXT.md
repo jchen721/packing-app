@@ -52,6 +52,18 @@ The packing slip's line quantity is not always the physical quantity. For exampl
 
 Do not casually replace the current parser. It supports multiple packing-slip formats and price placement patterns.
 
+## Product-name normalization
+
+TikTok may spell the same physical item several ways. Original wording must remain in the batch order manifests for auditing, while the Google Sheets picking checklist and inventory usage aggregate approved aliases under one canonical name.
+
+Current examples include:
+
+- First Partner Illustration/Series 3 variants -> `First Partner Series 3 Collection`
+- Random Chinese/CN/JP/KR booster-pack variants -> `Random Booster Pack (JP/KR/CN)`
+- Pitch Black booster-pack bracket/x1 variants -> `Pitch Black Booster Pack`
+
+Future AI may suggest likely aliases from processed batches, but it must not silently merge inventory products. A manager approves each new canonical mapping before it changes picking or inventory totals.
+
 ## Verification boundary
 
 Every input order normally contains two pages: one shipping label and one packing slip. They must always move together.

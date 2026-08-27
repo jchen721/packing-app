@@ -1,6 +1,7 @@
 const { google } = require("googleapis");
 const config = require("./appConfig");
 const { DEFAULT_SCHEMAS } = require("./googleSheetsSchema");
+const { normalizeProductName } = require("./buildInventoryUsage");
 
 const SPREADSHEET_ID = config.spreadsheetId;
 
@@ -14,19 +15,17 @@ function prepareRows(itemCountsPhysical) {
     throw new Error("No physical item counts were provided.");
   }
 
-  return Object.entries(itemCountsPhysical)
-    .filter(([item, amount]) => {
-      return (
-        String(item).trim() !== "" &&
-        Number.isFinite(Number(amount)) &&
-        Number(amount) > 0
-      );
-    })
-    .map(([item, amount]) => [
-      String(item).trim(),
-      Number(amount),
-      false
-    ])
+  const canonicalTotals = new Map();
+  for (const [item, amount] of Object.entries(itemCountsPhysical)) {
+    const quantity = Number(amount);
+    if (!String(item).trim() || !Number.isFinite(quantity) || quantity <= 0) continue;
+    const canonicalName = normalizeProductName(item);
+    if (!canonicalName) continue;
+    canonicalTotals.set(canonicalName, (canonicalTotals.get(canonicalName) || 0) + quantity);
+  }
+
+  return [...canonicalTotals.entries()]
+    .map(([item, amount]) => [item, amount, false])
     .sort((a, b) =>
       a[0].localeCompare(b[0], undefined, {
         sensitivity: "base"

@@ -24,6 +24,8 @@ This file records important behavioral and architectural decisions. It is not a 
 - Added ignore rules preventing sample PDFs, local Excel inventory copies, root JSON exports, temporary files, and the unrelated rent portal from entering packing-app commits.
 - Changed the downloadable worker ZIP to contain printable grouped PDFs only while preserving batch audit JSON internally.
 - Added regression coverage proving internal JSON is excluded from worker ZIPs and physical item totals create unchecked Google Sheets checklist rows.
+- Canonicalized TikTok spelling variants before writing the packing checklist and inventory usage, including First Partner Series 3, Random Chinese/CN booster packs, and Pitch Black booster packs.
+- Documented a safe learning model where AI proposes new aliases but managers approve them before inventory rows are merged.
 
 ## Prior decisions preserved
 
