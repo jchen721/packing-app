@@ -22,6 +22,8 @@ This file records important behavioral and architectural decisions. It is not a 
 - Removed unused root-level sample/output files and legacy one-off scripts before the warehouse deployment.
 - Removed the obsolete inventory-usage fallback that read root JSON; inventory usage now comes only from the selected batch manifest.
 - Added ignore rules preventing sample PDFs, local Excel inventory copies, root JSON exports, temporary files, and the unrelated rent portal from entering packing-app commits.
+- Changed the downloadable worker ZIP to contain printable grouped PDFs only while preserving batch audit JSON internally.
+- Added regression coverage proving internal JSON is excluded from worker ZIPs and physical item totals create unchecked Google Sheets checklist rows.
 
 ## Prior decisions preserved
 

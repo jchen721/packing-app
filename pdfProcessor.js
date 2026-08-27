@@ -141,7 +141,19 @@ function addToCounts(counts, products, usePhysical = false) {
   }
 }
 
+function listPrintablePackingFiles(sourceDir) {
+  return fs.readdirSync(sourceDir, { withFileTypes: true })
+    .filter(entry => entry.isFile() && path.extname(entry.name).toLowerCase() === ".pdf")
+    .map(entry => entry.name)
+    .sort((a, b) => a.localeCompare(b));
+}
+
 async function createZip(sourceDir, zipPath) {
+  const printableFiles = listPrintablePackingFiles(sourceDir);
+  if (printableFiles.length === 0) {
+    throw new Error("No printable packing PDFs were generated.");
+  }
+
   return new Promise((resolve, reject) => {
     const output = fs.createWriteStream(zipPath);
     const archive = archiver("zip", {
@@ -152,7 +164,9 @@ async function createZip(sourceDir, zipPath) {
     archive.on("error", reject);
 
     archive.pipe(output);
-    archive.directory(sourceDir, false);
+    for (const fileName of printableFiles) {
+      archive.file(path.join(sourceDir, fileName), { name: fileName });
+    }
     archive.finalize();
   });
 }
@@ -501,5 +515,7 @@ async function processPDFs(filePaths) {
 
 module.exports = {
   processPDFs,
-  getFinalGroup
+  getFinalGroup,
+  listPrintablePackingFiles,
+  createZip
 };

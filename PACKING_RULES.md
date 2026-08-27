@@ -1446,9 +1446,7 @@ Sleeved_Packs.pdf
 
 Needs_Review.pdf
 
-Also include:
-
-itemCountsPhysical.json
+Do not include JSON files in the worker ZIP. `itemCountsPhysical.json` and the other batch manifests remain in the private run directory for auditing and inventory review. Physical item totals are written to the Google Sheets picking checklist so workers can check items off as they place them on the shelf.
 
 DO NOT generate unnecessary per-group summary TXT files.
 
@@ -1767,3 +1765,5 @@ These clarifications were supplied after the original master specification:
 6. One standard Booster Box uses 7x5x5 temporarily because the preferred 7x4x3 supply is unavailable. Multiple Booster Boxes, Booster Display products, and mixed orders containing a Booster Box remain Needs Review until separately approved. Keep the worker-facing PDFs consolidated rather than creating a separate 7x5x5 PDF.
 
 7. Ascended Heroes Focused Fighters Premium Collection uses the 24-series family, matching Blooming Waters 151 and Paldean Fates Great Tusk.
+
+8. The downloadable worker ZIP contains only the grouped PDFs that need to be printed. Internal batch JSON remains in the private run directory. After verification passes, physical item totals continue to update the Google Sheets packing List with unchecked checklist boxes.

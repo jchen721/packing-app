@@ -86,6 +86,7 @@ npm run sync:supabase
 ## Packing safety
 
 - Uploaded temporary PDFs are removed after processing.
+- Downloaded worker ZIPs contain only the grouped PDFs that need to be printed; audit JSON remains in the private batch run directory.
 - Every run saves batch manifests inside its output directory.
 - Inventory is never deducted automatically after upload.
 - Confirmation validates current Google Sheets quantities.

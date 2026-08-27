@@ -178,5 +178,6 @@ async function updatePickingChecklist(itemCountsPhysical) {
 module.exports = {
   SHEET_NAME,
   HEADERS,
+  prepareRows,
   updatePickingChecklist
 };

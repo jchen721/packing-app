@@ -16,7 +16,7 @@ The core workflow is:
 6. Sort orders by Buyer Nickname within each group, falling back to Buyer ID.
 7. Generate grouped PDFs and verify that pages are neither lost nor duplicated.
 8. Generate physical item totals and update the Google Sheets picking checklist only after verification succeeds.
-9. Save an auditable packing batch and provide a downloadable ZIP.
+9. Save an auditable packing batch and provide a downloadable worker ZIP containing only printable grouped PDFs.
 10. Review proposed inventory usage separately from PDF processing.
 
 Reliability is more important than forcing every unfamiliar combination into a box. Unsupported combinations belong in `Needs Review`.
@@ -64,7 +64,7 @@ A batch is not successful until page verification confirms expected input/output
 
 ## Packing batches and inventory review
 
-Each successful processing run creates a stable packing batch and stores audit manifests in that run's output directory. The downloadable worker ZIP can stay simple even though the run directory contains richer internal audit data.
+Each successful processing run creates a stable packing batch and stores audit manifests in that run's output directory. The downloadable worker ZIP contains only grouped PDFs that need to be printed. Internal JSON files remain in the private run directory for review, duplicate protection, and auditing, and do not belong in the worker ZIP.
 
 Uploading PDFs does not automatically deduct inventory. The manager reviews the batch's products, exact boxes, and proposed deductions before confirmation. Confirmation must prevent duplicate deductions and must not mark a batch completed if the authoritative Google Sheets transaction fails.
 
