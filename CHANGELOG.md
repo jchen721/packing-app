@@ -19,6 +19,7 @@ This file records important behavioral and architectural decisions. It is not a 
 - Preserved named oversized collection exceptions and routed unsupported collection/ETB/UPC quantities to `Needs Review`.
 - Added exact inventory deductions for `11x11x3`, `12x12x12`, and `16x12x12`, while consolidating `12x12x12` into the existing `11_Box.pdf` worker workflow.
 - Expanded Pokémon Day-sized behavior to First Partner Series 2 and Series 3, including multi-quantity orders, and classified Legendary Warriors plus Unova Heavy Hitters in the Blooming Waters-sized 24-inch family.
+- Recorded owner approval for the live box-only inventory rollout and changed the safe environment template to enable deductions only after explicit batch confirmation.
 
 ## 2026-08-27
 

@@ -80,13 +80,13 @@ Each successful processing run creates a stable packing batch and stores audit m
 
 Uploading PDFs does not automatically deduct inventory. The manager reviews the batch's products, exact boxes, and proposed deductions before confirmation. Confirmation must prevent duplicate deductions and must not mark a batch completed if the authoritative Google Sheets transaction fails.
 
-The application currently defaults to packing-only safety mode:
+The warehouse rollout was explicitly approved on 2026-09-15. The safe environment template now enables confirmed packing-supply deductions:
 
 ```env
-INVENTORY_WRITES_ENABLED=false
+INVENTORY_WRITES_ENABLED=true
 ```
 
-Keep it disabled until Ace has verified the warehouse's starting inventory and the owner explicitly requests a controlled activation test.
+The scope remains `boxes`, so Pokémon product inventory is not deducted. Uploading PDFs never changes inventory by itself; a user must explicitly confirm the reviewed batch. Machine-local `.env` files remain ignored by Git, and each computer must create its own from `.env.example`.
 
 The first controlled inventory rollout is box-only. `Box Inventory` contains item, quantity, low-stock level, reorder amount, unit cost, and notes. Product quantities remain visible for picking and audit without being deducted. Blank box quantities mean a physical count is still required. Long 24-series products use 24x12x4 alone and 24x12x6 when one or more ETBs add height. The manager's current ETB ladder assigns four/five ETBs to 12x12x12 and six ETBs to 16x12x8; larger quantities require review.
 
