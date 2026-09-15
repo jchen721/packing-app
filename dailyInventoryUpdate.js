@@ -5,6 +5,8 @@ const googleInventory = require("./googleInventoryManager");
 const { createGoogleBatchRegistry } = require("./googleBatchRegistry");
 const { findBatch, readBatchReview } = require("./batchService");
 const { buildInventoryAvailability } = require("./inventoryAvailability");
+const config = require("./appConfig");
+const { isTrackedPackingSupply } = require("./boxInventoryCatalog");
 
 const OUTPUTS_DIR = path.join(__dirname, "outputs");
 const PROCESSED_BATCHES_FILE = path.join(__dirname, "processedBatches.json");
@@ -44,7 +46,10 @@ function createLocalBatchRegistry(filePath = PROCESSED_BATCHES_FILE) {
 function createConfirmationService({
   inventoryGateway = googleInventory,
   registry = createLocalBatchRegistry(),
-  outputsDir = OUTPUTS_DIR
+  outputsDir = OUTPUTS_DIR,
+  selectUsage = usage => usage,
+  validateUsage = () => true,
+  allowEmptyUsage = false
 } = {}) {
   const confirmationsInProgress = new Set();
 
@@ -53,17 +58,24 @@ function createConfirmationService({
     const duplicateOrders = registry.findProcessedOrders
       ? await registry.findProcessedOrders(review.orderKeys || [])
       : [];
+    const proposedDeductions = selectUsage(review.proposedDeductions);
     let inventoryAvailability = [];
     let inventoryValidationError = null;
-    if (typeof inventoryGateway.readInventory === "function") {
+    try {
+      validateUsage(proposedDeductions);
+    } catch (error) {
+      inventoryValidationError = error.message;
+    }
+    if (!inventoryValidationError && typeof inventoryGateway.readInventory === "function") {
       try {
-        inventoryAvailability = buildInventoryAvailability(review.proposedDeductions, await inventoryGateway.readInventory());
+        inventoryAvailability = buildInventoryAvailability(proposedDeductions, await inventoryGateway.readInventory());
       } catch (error) {
         inventoryValidationError = `Current inventory could not be validated. ${error.message}`;
       }
     }
     const inventoryReady = !inventoryValidationError && inventoryAvailability.every(row => row.status === "READY");
-    return { ...review, duplicateOrders, alreadyProcessed: await registry.has(batchId) || duplicateOrders.length > 0, inventoryAvailability, inventoryReady, inventoryValidationError };
+    const trackingWarnings = inventoryValidationError && /24-series/.test(inventoryValidationError) ? [inventoryValidationError] : [];
+    return { ...review, proposedDeductions, trackingWarnings, duplicateOrders, alreadyProcessed: await registry.has(batchId) || duplicateOrders.length > 0, inventoryAvailability, inventoryReady, inventoryValidationError };
   }
 
   async function confirm(batchId, metadata = {}) {
@@ -84,8 +96,10 @@ function createConfirmationService({
       const orderIds = duplicateOrders.map(match => match.orderKey.replace(/^order:/, "")).join(", ");
       throw new Error(`Inventory was already deducted for ${duplicateOrders.length} order(s): ${orderIds}`);
     }
-    const usage = JSON.parse(fs.readFileSync(path.join(found.runDir, "inventory_usage.json"), "utf8"));
-    if (!Array.isArray(usage) || usage.length === 0) throw new Error("No inventory usage was found.");
+    const fullUsage = JSON.parse(fs.readFileSync(path.join(found.runDir, "inventory_usage.json"), "utf8"));
+    const usage = selectUsage(fullUsage);
+    if (!Array.isArray(usage) || (!allowEmptyUsage && usage.length === 0)) throw new Error("No inventory usage was found.");
+    validateUsage(usage);
 
     confirmationsInProgress.add(batchId);
     let reservation;
@@ -94,18 +108,23 @@ function createConfirmationService({
       if (registry.reserve) {
         reservation = await registry.reserve({ batchId, orderKeys: review.orderKeys, user: metadata.user });
       }
-      const updateResult = await inventoryGateway.subtractInventory(usage, {
-        batchId,
-        user: metadata.user,
-        reason: metadata.reason || "Confirmed packing batch"
-      });
-      inventoryUpdated = true;
+      const updateResult = usage.length
+        ? await inventoryGateway.subtractInventory(usage, {
+          batchId,
+          user: metadata.user,
+          reason: metadata.reason || "Confirmed packing batch"
+        })
+        : { success: true, itemsUpdated: 0 };
+      inventoryUpdated = usage.length > 0;
 
       const processedAt = new Date().toISOString();
       try {
         await registry.markProcessed({ batchId, orderKeys: review.orderKeys, processedAt, user: metadata.user || "Unknown user", itemsDeducted: usage }, reservation);
       } catch (error) {
-        throw new Error(`Inventory was updated, but the shared batch record could not be finalized. Do not retry this batch; manual review is required. ${error.message}`);
+        const prefix = usage.length
+          ? "Inventory was updated, but the shared batch record could not be finalized. Do not retry this batch; manual review is required."
+          : "No inventory change was needed, but the shared batch record could not be finalized.";
+        throw new Error(`${prefix} ${error.message}`);
       }
 
       const completedBatch = { ...found.batch, status: "inventory_confirmed", confirmedAt: processedAt, confirmedBy: metadata.user || "Unknown user" };
@@ -143,12 +162,31 @@ function createHybridRegistry(shared = createGoogleBatchRegistry(), local = crea
   };
 }
 
-const defaultService = createConfirmationService({ registry: createHybridRegistry() });
+function selectTrackedInventoryUsage(usage, scope = "boxes") {
+  if (!Array.isArray(usage)) return [];
+  return scope === "all" ? usage : usage.filter(entry => isTrackedPackingSupply(entry.item) || String(entry.item || "").trim() === "24 Boxes");
+}
+
+function validateResolvedBoxUsage(usage) {
+  if ((usage || []).some(entry => String(entry.item || "").trim() === "24 Boxes")) {
+    throw new Error("This batch contains a 24-series box. Confirm whether it uses 24x12x4 or 24x12x6 before inventory can be deducted.");
+  }
+  return true;
+}
+
+const defaultService = createConfirmationService({
+  registry: createHybridRegistry(),
+  selectUsage: usage => selectTrackedInventoryUsage(usage, config.inventoryTrackingScope),
+  validateUsage: config.inventoryTrackingScope === "boxes" ? validateResolvedBoxUsage : () => true,
+  allowEmptyUsage: config.inventoryTrackingScope === "boxes"
+});
 
 module.exports = {
   createLocalBatchRegistry,
   createHybridRegistry,
   createConfirmationService,
+  selectTrackedInventoryUsage,
+  validateResolvedBoxUsage,
   previewDailyInventoryUpdate: batchId => defaultService.preview(batchId),
   confirmDailyInventoryUpdate: (batchId, metadata) => defaultService.confirm(batchId, metadata)
 };

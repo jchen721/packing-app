@@ -2,6 +2,24 @@
 
 This file records important behavioral and architectural decisions. It is not a replacement for Git history.
 
+## 2026-09-15
+
+- Prepared the first box-only inventory rollout without enabling permanent writes.
+- Added a shared `Box Inventory` tab schema and an idempotent catalog seeder using the owner-provided vendor sizes, item numbers, reference order quantities, and unit costs.
+- Kept starting quantities blank so vendor purchase quantities cannot be mistaken for physical warehouse counts.
+- Made packing confirmation select only box deductions in the current rollout while preserving complete product and box usage in every batch audit manifest.
+- Added an explicit physical-count-required state.
+- Added the approved long-product rule: 24-series product alone uses 24x12x4; adding one or more ETBs uses 24x12x6. Both remain in the existing worker-facing `24_Box.pdf`. ETB-only 5+ orders remain unresolved for exact inventory sizing.
+- Simplified `Box Inventory` to item, quantity, low-stock level, reorder amount, unit cost, and notes. Removed redundant dimensions, vendor item, reference order quantity, and starting-count status columns.
+- Added optional Gmail low-stock alerts after a confirmed box deduction crosses its configured threshold. Email failures are returned as warnings and never change the completed inventory transaction.
+- Added the manager-provided initial box quantities, including packing-supply unit conversions for 1,500 bubble mailers and 1,750 bubble-wrap pieces.
+- Added one bubble-mailer deduction per verified Packs Only order and bubble-wrap usage of 2 per ETB, 1 per tin, 3 per SPC, 4 per UPC, and 4 per approved Blooming Waters-sized long product.
+- Stopped read-only batch, worker, and inventory screens from recreating optional Google Sheet tabs that the owner removed.
+- Applied the manager's revised physical-box chart: Japanese Booster Box `8x8x4`, poster sizes from `11x11x3` through `11x11x9`, four/five ETBs `12x12x12`, six ETBs `16x12x8`, quantity-aware UPC/collection rules, and the two-Victini `13x10x4` exception.
+- Preserved named oversized collection exceptions and routed unsupported collection/ETB/UPC quantities to `Needs Review`.
+- Added exact inventory deductions for `11x11x3`, `12x12x12`, and `16x12x12`, while consolidating `12x12x12` into the existing `11_Box.pdf` worker workflow.
+- Expanded Pokémon Day-sized behavior to First Partner Series 2 and Series 3, including multi-quantity orders, and classified Legendary Warriors plus Unova Heavy Hitters in the Blooming Waters-sized 24-inch family.
+
 ## 2026-08-27
 
 - Added permanent `PROJECT_CONTEXT.md` and `PACKING_RULES.md` documentation so future Codex tasks do not depend on old chat history.

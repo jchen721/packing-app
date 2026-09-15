@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { boundedNumber, booleanSetting, resolveSpreadsheetIds } = require("../appConfig");
+const { boundedNumber, booleanSetting, resolveInventoryTrackingScope, resolveLowStockEmailSettings, resolveSpreadsheetIds } = require("../appConfig");
 
 test("bounded numeric configuration rejects invalid and empty values", () => {
   assert.equal(boundedNumber("not-a-number", 15, { min: 5, max: 60 }), 15);
@@ -18,6 +18,25 @@ test("bounded numeric configuration enforces limits and whole numbers", () => {
 test("only the operations spreadsheet is configured", () => {
   assert.deepEqual(resolveSpreadsheetIds({ GOOGLE_SPREADSHEET_ID: " operations " }), { operations: "operations" });
   assert.deepEqual(resolveSpreadsheetIds({ GOOGLE_SPREADSHEET_ID: "operations", GOOGLE_LIVESTREAM_SPREADSHEET_ID: "ignored" }), { operations: "operations" });
+});
+
+test("box-only inventory is the safe default tracking scope", () => {
+  assert.equal(resolveInventoryTrackingScope(undefined), "boxes");
+  assert.equal(resolveInventoryTrackingScope("ALL"), "all");
+  assert.equal(resolveInventoryTrackingScope("unsupported"), "boxes");
+});
+
+test("low-stock email stays disabled until every private setting is supplied", () => {
+  assert.deepEqual(resolveLowStockEmailSettings({}), { enabled: false, configured: false, user: "", appPassword: "", recipients: [] });
+  const settings = resolveLowStockEmailSettings({
+    LOW_STOCK_EMAIL_ENABLED: "true",
+    LOW_STOCK_EMAIL_USER: "sender@example.com",
+    LOW_STOCK_EMAIL_APP_PASSWORD: "private",
+    LOW_STOCK_EMAIL_RECIPIENTS: "one@example.com, two@example.com"
+  });
+  assert.equal(settings.enabled, true);
+  assert.equal(settings.configured, true);
+  assert.deepEqual(settings.recipients, ["one@example.com", "two@example.com"]);
 });
 
 test("boolean settings fail closed on unknown values", () => {

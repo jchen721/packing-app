@@ -84,6 +84,10 @@ function countCategories(products) {
     megaItems: 0,
     largePremiums: 0,
     boosterBoxes: 0,
+    japaneseBoosterBoxes: 0,
+    boosterBundles: 0,
+    collectionBoxes: 0,
+    victiniCollections: 0,
     deluxePin: 0,
     box24: 0,
     unknown: 0
@@ -106,12 +110,14 @@ function getBuyerNickname(pageText, buyerId) {
 }
 
 function getFinalGroup(exactGroup) {
+  if (exactGroup === "8x6x4") return "6_Box";
   if (exactGroup === "8x8x4") return "8x8x4";
   if (exactGroup === "8x8x8") return "8x8x8";
 
   if (exactGroup.startsWith("6x")) return "6_Box";
   if (exactGroup.startsWith("7x")) return "6_Box";
   if (exactGroup.startsWith("11x")) return "11_Box";
+  if (exactGroup.startsWith("12x")) return "11_Box";
   if (exactGroup.startsWith("13x")) return "13_Box";
   if (exactGroup.startsWith("16x")) return "16_Box";
   if (exactGroup.includes("24")) return "24_Box";

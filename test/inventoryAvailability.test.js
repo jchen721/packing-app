@@ -21,3 +21,13 @@ test("packing confirmation rejects missing and insufficient shared stock", () =>
   assert.throws(() => assertInventoryAvailability(rows), /not found.*Missing Box/);
   assert.throws(() => assertInventoryAvailability([rows[0]]), /stock 10, required 11/);
 });
+
+test("blank Box Inventory quantities require a verified physical count", () => {
+  const rows = buildInventoryAvailability(
+    [{ item: "7x5x5 Boxes", quantity: 2 }],
+    [{ item: "7x5x5 Boxes", quantity: null, quantityVerified: false, category: "Warehouse Supplies" }]
+  );
+  assert.equal(rows[0].status, "COUNT REQUIRED");
+  assert.equal(rows[0].newQuantity, null);
+  assert.throws(() => assertInventoryAvailability(rows), /physical starting count.*7x5x5 Boxes/);
+});

@@ -10,29 +10,34 @@ function cleanText(text) {
     if (name.includes("paldean fates great tusk")) return "box24";
     if (name.includes("unova premium collection")) return "box24";
     if (name.includes("heavy hitters")) return "box24";
+    if (name.includes("legendary warriors premium collection")) return "box24";
     if (
       name.includes("ascended heroes focused fighters premium collection") ||
       name.includes("ascended heroes focused collection")
     ) return "box24";
 
-    // First Partner Series 3 collections use the same physical box behavior
-    // as the approved Pokemon Day collection family.
+    // First Partner Series 2 and 3 collections use the same physical box
+    // behavior as the approved Pokemon Day collection family.
     if (
       name.includes("first partner illustration collection") ||
-      name.includes("first partner - series 3 collection") ||
-      name.includes("first partner series 3 collection")
+      /first partner\s*-?\s*series\s+[23]\s+collection/.test(name)
     ) return "firstPartners";
   
     // 13x10x6 products
     if (name.includes("deluxe pin collection")) return "deluxePin";
   
-    // Standard Booster Boxes use the temporary 7x5x5 supply. Booster Display
-    // products remain unapproved and continue to manual review.
-    if (/\bbooster\s+box(?:es)?\b/.test(name)) return "boosterBoxes";
     if (/\bbooster\s+display(?:\s+box(?:es)?)?\b/.test(name)) return "unknown";
 
-    // Booster bundles share the 6x6x6 packing rules regardless of set name.
-    if (/booster bundles?$/.test(name)) return "tins";
+    // The manager's current chart separates Japanese booster boxes from other
+    // standard booster boxes because they use a different physical box.
+    if (/\bbooster\s+box(?:es)?\b/.test(name)) {
+      if (/\b(?:jp|japanese)\b/.test(name)) return "japaneseBoosterBoxes";
+      return "boosterBoxes";
+    }
+
+    // Keep bundles distinct from actual tins so explicit ETB + bundle rules do
+    // not accidentally apply to ETB + tin orders.
+    if (/booster bundles?$/.test(name)) return "boosterBundles";
   
     // ETBs
     if (name.includes("etb") || name.includes("elite trainer box")) {
@@ -84,6 +89,13 @@ function cleanText(text) {
   
     // Posters
     if (name.includes("poster")) return "posters";
+
+    // Named/special collection families above keep their approved sizes.
+    // Remaining normal collection boxes use the manager's collection ladder.
+    if (name.includes("victini") && /\bcollection(?:\s+box)?\b/.test(name)) {
+      return "victiniCollections";
+    }
+    if (/\bcollection(?:\s+box)?\b/.test(name)) return "collectionBoxes";
   
     return "unknown";
   }
@@ -107,6 +119,10 @@ function cleanText(text) {
       megaItems,
       largePremiums,
       boosterBoxes = 0,
+      japaneseBoosterBoxes = 0,
+      boosterBundles = 0,
+      collectionBoxes = 0,
+      victiniCollections = 0,
       deluxePin,
       box24,
       unknown
@@ -117,24 +133,37 @@ function cleanText(text) {
     // Only the single standard Booster Box rule is currently approved.
     // Multiple or mixed Booster Box orders remain in Needs Review until the
     // warehouse provides a capacity rule.
-    if (boosterBoxes > 0) {
+    if (boosterBoxes > 0 || japaneseBoosterBoxes > 0) {
+      if (japaneseBoosterBoxes === 1 && boosterBoxes === 0 && onlyThese(counts, ["japaneseBoosterBoxes"])) {
+        return "8x8x4";
+      }
       if (boosterBoxes === 1 && onlyThese(counts, ["boosterBoxes"])) {
         return "7x5x5";
       }
       return "Needs Review";
     }
   
-    if (box24 > 0) return "24 Box";
+    // Long 24-series products use the shallow box unless one or more ETBs add
+    // height. They remain consolidated into 24_Box.pdf for workers.
+    if (box24 > 0) return etbs > 0 ? "24x12x6" : "24x12x4";
 
-    // One First Partner collection is approved as Pokemon Day-sized. Larger
-    // quantities and mixed First Partner/Pokemon Day orders are not approved.
-    if (firstPartners > 1 || (firstPartners > 0 && pokemonDays > 0)) {
-      return "Needs Review";
-    }
-
+    // First Partner Series 2/3 quantities follow the same combinations as
+    // Pokemon Day rather than requiring a named-product exception.
     const pokemonDayLike = pokemonDays + firstPartners;
   
     if (deluxePin > 0) return "13x10x6";
+
+    // Two Victini collection boxes have a specifically approved footprint.
+    if (victiniCollections > 0) {
+      if (victiniCollections === 2 && onlyThese(counts, ["victiniCollections", "normalPacks", "sleevedPacks"])) {
+        return "13x10x4";
+      }
+      // A single collection with one ETB follows the collection + ETB rule.
+      if (victiniCollections === 1 && etbs === 1 && onlyThese(counts, ["victiniCollections", "etbs", "normalPacks", "sleevedPacks"])) {
+        return "13x10x6";
+      }
+      return "Needs Review";
+    }
   
     // Sleeves only
     if (sleevedPacks > 0 && onlyThese(counts, ["sleevedPacks"])) {
@@ -149,11 +178,24 @@ function cleanText(text) {
       return "Packs Only";
     }
   
-    // 16 family
+    // Normal collection boxes use the manager's current collection ladder.
+    if (collectionBoxes > 0) {
+      if (collectionBoxes === 1 && largePremiums === 1 && etbs === 0 && onlyThese(counts, ["collectionBoxes", "largePremiums", "normalPacks", "sleevedPacks"])) return "16x12x6";
+      if (collectionBoxes === 1 && largePremiums === 0 && etbs === 2 && onlyThese(counts, ["collectionBoxes", "etbs", "normalPacks", "sleevedPacks"])) return "16x12x6";
+      if (collectionBoxes === 1 && largePremiums === 0 && etbs === 1 && onlyThese(counts, ["collectionBoxes", "etbs", "normalPacks", "sleevedPacks"])) return "13x10x6";
+      if (collectionBoxes === 1 && largePremiums === 0 && etbs === 0 && onlyThese(counts, ["collectionBoxes", "normalPacks", "sleevedPacks"])) return "16x12x4";
+      return "Needs Review";
+    }
+
+    // 16 family. Quantity-specific rules override the old single-item base.
     if (largePremiums > 0) {
-      if (etbs >= 2) return "16x12x8";
-      if (etbs === 1 || pokemonDayLike >= 1 || posters >= 1) return "16x12x6";
-      return "16x12x4";
+      if (largePremiums === 3 && etbs === 0 && posters === 0 && pokemonDayLike === 0) return "16x12x12";
+      if (largePremiums === 2 && etbs === 2 && posters === 0 && pokemonDayLike === 0) return "16x12x12";
+      if (largePremiums === 2 && etbs === 0 && posters === 0 && pokemonDayLike === 0) return "16x12x8";
+      if (largePremiums === 1 && etbs === 2 && posters === 0 && pokemonDayLike === 0) return "16x12x8";
+      if (largePremiums === 1 && (etbs === 1 || pokemonDayLike >= 1 || posters >= 1)) return "16x12x6";
+      if (largePremiums === 1) return "16x12x4";
+      return "Needs Review";
     }
   
     // 13 family
@@ -163,15 +205,16 @@ function cleanText(text) {
       return "13x10x4";
     }
   
-    // ETB-heavy orders
-    if (etbs >= 5) return "24 Box";
-    if (etbs === 4) return "16x12x8";
-    if (etbs === 3) return "11x11x7";
-  
     // Posters
     if (posters > 0) {
-      if (etbs >= 2) return "11x11x9";
-      return "11x11x5";
+      if (etbs >= 4 && etbs <= 5) return "12x12x12";
+      if (etbs === 3) return "11x11x9";
+      if (etbs === 2) return "11x11x9";
+      if (etbs === 1 && posters === 2) return "11x11x7";
+      if (etbs === 1 && posters === 1) return "11x11x5";
+      if (etbs === 0 && posters === 2) return "11x11x5";
+      if (etbs === 0 && posters === 1) return "11x11x3";
+      return "Needs Review";
     }
   
     // Pokemon Day
@@ -181,13 +224,18 @@ function cleanText(text) {
       return "8x8x4";
     }
   
-    // ETBs only, or ETBs with packs/sleeves/tins
+    // ETB ladder from the manager's current physical-box chart.
+    if (etbs === 6) return "16x12x8";
+    if (etbs >= 4 && etbs <= 5) return "12x12x12";
+    if (etbs === 3) return "11x11x7";
+    if (etbs === 2 && boosterBundles > 0) return "11x11x7";
     if (etbs === 2) return "8x8x8";
     if (etbs === 1) return "8x8x4";
+    if (etbs > 6) return "Needs Review";
   
-    // Tins / bundles only, or tins with packs/sleeves
-    if (tins > 0 && tins <= 6) return "6x6x6";
-    if (tins > 6) return "Needs Review";
+    // Tins / bundles only, or with packs/sleeves.
+    if (tins + boosterBundles > 0 && tins + boosterBundles <= 6) return "6x6x6";
+    if (tins + boosterBundles > 6) return "Needs Review";
   
     return "Needs Review";
   }

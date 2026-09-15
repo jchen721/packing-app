@@ -19,9 +19,15 @@ function createGoogleBatchRegistry() {
     }
   }
 
-  async function readRows() {
+  async function sheetExists(sheets) {
+    const metadata = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID, fields: "sheets.properties.title" });
+    return metadata.data.sheets.some(sheet => sheet.properties.title === SHEET_NAME);
+  }
+
+  async function readRows({ createIfMissing = false } = {}) {
     const sheets = await getSheetsClient();
-    await ensureSheet(sheets);
+    if (createIfMissing) await ensureSheet(sheets);
+    else if (!await sheetExists(sheets)) return { sheets, rows: [], missing: true };
     const response = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `'${SHEET_NAME}'!A2:G` });
     return { sheets, rows: (response.data.values || []).map((row, index) => ({
       rowNumber: index + 2, createdAt: row[0] || "", batchId: row[1] || "", orderKey: row[2] || "",
@@ -44,7 +50,7 @@ function createGoogleBatchRegistry() {
     const attemptId = crypto.randomUUID(); const now = new Date().toISOString();
     await sheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: `'${SHEET_NAME}'!A:G`, valueInputOption: "RAW", insertDataOption: "INSERT_ROWS", requestBody: { values: orderKeys.map(orderKey => [now, batchId, orderKey, "RESERVED", user || "Unknown user", attemptId, now]) } });
 
-    const current = await readRows();
+    const current = await readRows({ createIfMissing: true });
     const active = current.rows.filter(row => orderKeys.includes(row.orderKey) && ["RESERVED", "CONFIRMED"].includes(row.status));
     const conflicts = orderKeys.map(orderKey => active.find(row => row.orderKey === orderKey)).filter(row => row && row.attemptId !== attemptId);
     if (conflicts.length > 0) {

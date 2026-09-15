@@ -30,6 +30,22 @@ function booleanSetting(value, fallback = false) {
   return fallback;
 }
 
+function resolveInventoryTrackingScope(value, fallback = "boxes") {
+  const cleaned = String(value || fallback).trim().toLowerCase();
+  return ["boxes", "all"].includes(cleaned) ? cleaned : fallback;
+}
+
+function resolveLowStockEmailSettings(environment = process.env) {
+  const recipients = String(environment.LOW_STOCK_EMAIL_RECIPIENTS || "")
+    .split(",")
+    .map(value => value.trim())
+    .filter(Boolean);
+  const user = textSetting(environment.LOW_STOCK_EMAIL_USER);
+  const appPassword = textSetting(environment.LOW_STOCK_EMAIL_APP_PASSWORD);
+  const enabled = booleanSetting(environment.LOW_STOCK_EMAIL_ENABLED, false);
+  return { enabled, configured: Boolean(user && appPassword && recipients.length), user, appPassword, recipients };
+}
+
 function resolveSupabaseSettings(environment = process.env) {
   const url = textSetting(environment.SUPABASE_URL);
   const publishableKey = textSetting(environment.SUPABASE_PUBLISHABLE_KEY || environment.SUPABASE_ANON_KEY);
@@ -52,10 +68,13 @@ function resolveSupabaseSettings(environment = process.env) {
 }
 
 const supabase = resolveSupabaseSettings();
+const lowStockEmail = resolveLowStockEmailSettings();
 
 module.exports = Object.freeze({
   boundedNumber,
   booleanSetting,
+  resolveInventoryTrackingScope,
+  resolveLowStockEmailSettings,
   textSetting,
   resolveSpreadsheetIds,
   resolveSupabaseSettings,
@@ -69,5 +88,7 @@ module.exports = Object.freeze({
   minimumFreeDiskBytes: boundedNumber(process.env.MINIMUM_FREE_DISK_BYTES, 5 * 1024 ** 3, { min: 100 * 1024 ** 2, max: 10 * 1024 ** 4 }),
   operationRecoveryMinimumMinutes: boundedNumber(process.env.OPERATION_RECOVERY_MINIMUM_MINUTES, 15, { min: 5, max: 1440 }),
   inventoryWritesEnabled: booleanSetting(process.env.INVENTORY_WRITES_ENABLED, false),
+  inventoryTrackingScope: resolveInventoryTrackingScope(process.env.INVENTORY_TRACKING_SCOPE, "boxes"),
+  lowStockEmail,
   supabase
 });

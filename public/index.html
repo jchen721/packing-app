@@ -69,7 +69,7 @@
       <div id="reviewStats" class="stats"></div>
       <h3>Products used</h3><div id="products"></div>
       <h3>Shipping boxes used</h3><div id="boxes"></div>
-      <h3>Proposed inventory deductions</h3><div id="deductions"></div>
+      <h3>Proposed tracked deductions</h3><div id="deductions"></div>
       <h3>Current Google Sheets inventory check</h3>
       <div id="availability"></div>
       <p id="availabilityMessage" role="status"></p>
@@ -93,7 +93,7 @@
   <main id="inventory" hidden>
     <section class="card">
       <h2>Current inventory</h2>
-      <p class="note">Google Sheets is the editable source of truth. This screen is read-only and refreshes the latest quantities from the Inventory and Warehouse Supplies tabs.</p>
+      <p class="note">Google Sheets is the editable source of truth. Box counts come from the Box Inventory tab. A blank quantity means the starting physical count is still required.</p>
       <div class="actions"><button id="refreshInventory" type="button" class="secondary">Refresh inventory</button></div>
       <div id="inventoryStats" class="stats"></div>
       <div id="inventoryTable"></div>
@@ -202,13 +202,14 @@
       makeTable(document.getElementById("boxes"), ["Item", "Quantity"], itemRows(data.boxes));
       makeTable(document.getElementById("deductions"), ["Item", "Quantity"], itemRows(data.proposedDeductions));
       makeTable(document.getElementById("availability"), ["Item", "Category", "Current", "Deduction", "After", "Status"],
-        (data.inventoryAvailability || []).map(row => [row.item, row.category, row.currentQuantity ?? "Missing", row.quantity, row.newQuantity ?? "—", row.status]));
+        (data.inventoryAvailability || []).map(row => [row.item, row.category, row.status === "COUNT REQUIRED" ? "Count required" : row.currentQuantity ?? "Missing", row.quantity, row.newQuantity ?? "—", row.status]));
       const availability = document.getElementById("availabilityMessage");
+      const trackingWarning = (data.trackingWarnings || []).join(" ");
       if (!inventoryWritesEnabled) {
-        setStatus(availability, "Review only: no inventory will be deducted in packing-only mode.", "success");
+        setStatus(availability, `${trackingWarning ? `${trackingWarning} ` : ""}Review only: no inventory will be deducted in packing-only mode.`, trackingWarning ? "error" : "success");
       } else {
         setStatus(availability,
-          data.inventoryValidationError || (data.inventoryReady ? "Every proposed deduction is available." : "Correct missing names or quantities in Google Sheets before confirming."),
+          trackingWarning || data.inventoryValidationError || (data.inventoryReady ? "Every tracked box deduction is available." : "Enter missing starting counts or correct quantities in Google Sheets before confirming."),
           data.inventoryReady ? "success" : "error");
       }
       document.getElementById("download").href = `/batches/${data.batchId}/download`;
@@ -304,9 +305,9 @@
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Could not load inventory.");
         inventoryItems = data.items || [];
-        makeStats(document.getElementById("inventoryStats"), [["Items", data.totalItems], ["Total units", data.totalUnits], ["Low stock", data.lowStockItems], ["Out of stock", data.outOfStockItems]]);
+        makeStats(document.getElementById("inventoryStats"), [["Items", data.totalItems], ["Total units", data.totalUnits], ["Count needed", data.countRequiredItems || 0], ["Low stock", data.lowStockItems], ["Out of stock", data.outOfStockItems]]);
         makeTable(document.getElementById("inventoryTable"), ["Item", "Category", "Quantity", "Low-stock level", "Reorder amount", "Status"],
-          inventoryItems.map(item => [item.item, item.category, item.quantity, item.lowStockLevel, item.reorderAmount, item.stockStatus]));
+          inventoryItems.map(item => [item.item, item.category, item.quantityVerified === false ? "Count required" : item.quantity, item.lowStockLevel, item.reorderAmount, item.stockStatus]));
         refreshReceiptSelectors();
         setStatus(message, `Inventory refreshed ${new Date().toLocaleTimeString()}.`, "success");
       } catch (error) {
@@ -423,9 +424,9 @@
         inventoryWritesEnabled = data.inventoryWritesEnabled === true;
         document.getElementById("inventoryConfirmationControls").hidden = !inventoryWritesEnabled;
         document.getElementById("receiptSection").hidden = !inventoryWritesEnabled;
-        document.getElementById("operatingMode").textContent = inventoryWritesEnabled ? "Packing and inventory mode" : "Packing-only mode";
+        document.getElementById("operatingMode").textContent = inventoryWritesEnabled ? "Packing and box inventory mode" : "Packing-only mode";
         document.getElementById("operatingModeMessage").textContent = inventoryWritesEnabled
-          ? "Confirmed packing runs and receipts can update inventory."
+          ? "Confirmed packing runs update box inventory. Product quantities remain visible for picking but are not deducted in the current box-only phase."
           : "Packing files can be generated, but permanent inventory changes are disabled until the warehouse starting count is verified.";
         const schemaReady = (data.googleSheets.schemaValidation || []).filter(row => row.ready).length;
         makeStats(document.getElementById("connectionStats"), [

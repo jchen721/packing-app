@@ -88,12 +88,19 @@ INVENTORY_WRITES_ENABLED=false
 
 Keep it disabled until Ace has verified the warehouse's starting inventory and the owner explicitly requests a controlled activation test.
 
+The first controlled inventory rollout is box-only. `Box Inventory` contains item, quantity, low-stock level, reorder amount, unit cost, and notes. Product quantities remain visible for picking and audit without being deducted. Blank box quantities mean a physical count is still required. Long 24-series products use 24x12x4 alone and 24x12x6 when one or more ETBs add height. The manager's current ETB ladder assigns four/five ETBs to 12x12x12 and six ETBs to 16x12x8; larger quantities require review.
+
+The initial packing-supply baseline also tracks individual Bubble Mailers and Bubble Wrap Pieces in `Box Inventory`. Vendor packaging is converted to usable units before entering Quantity: 3 cases of 500 mailers = 1,500 mailers, and 5 rolls of 350 wrap pieces = 1,750 pieces. Packing usage deducts one mailer for a verified Packs Only order and deterministic wrap pieces by product type.
+
+Read-only inventory, batch-history, and worker-history requests must not create deleted or optional Google Sheet tabs. Technical tabs may be created only when the corresponding shared write feature is deliberately used or when the explicit setup command is run.
+
 ## Current shared data
 
 Google Sheets is the editable operational source of truth for:
 
 - `Inventory`
 - `Warehouse Supplies`
+- `Box Inventory`
 - `packing List`
 - `Packing Batches`
 - `Packing Activity`
@@ -142,6 +149,16 @@ Known current facts as of 2026-08-27:
 - Product aliases for Random Booster Packs, Ascended Heroes Mega Emboar boxes, and Lumiose tins are normalized for inventory usage.
 - Slab capacity and mixed-order rules remain unresolved. Do not assign slabs to `7x5x5` merely because that box is now approved for one standard Booster Box.
 - The owner is currently testing real `Needs Review` orders and will provide the correct physical box for each approved example.
+
+### Manager box chart update — 2026-09-15
+
+The newest manager chart supersedes the older generic ETB/poster ladder where the two conflict. One poster uses `11x11x3`; two posters or one poster plus one ETB use `11x11x5`; two posters plus one ETB and two ETBs plus a Booster Bundle use `11x11x7`; three ETBs plus a poster use `11x11x9`; four or five ETBs use `12x12x12`; and six ETBs use `16x12x8`. Seven or more ETBs remain `Needs Review`.
+
+One Japanese/JP Booster Box uses `8x8x4`; the existing one-box `7x5x5` rule remains for other standard Booster Boxes. Generic collection boxes use their approved collection ladder, while named physical exceptions such as Blooming Waters, First Partner, Mega-family, and other existing special products retain their established categories. The legacy `8x6x4` result is treated as the replacement `6x6x6` supply.
+
+First Partner Series 2 and Series 3 use the existing Pokémon Day behavior, including quantities greater than one: without an ETB they remain in `8x8x4`, and the established Pokémon Day + ETB combination rules still apply. `Legendary Warriors Premium Collection` and `Unova Premium Collection - Heavy Hitters` are explicitly approved as the same long 24-series physical family as Blooming Waters.
+
+`12x12x12` remains consolidated into `11_Box.pdf` so this new exact supply estimate does not add another worker-facing PDF. Exact `11x11x3`, `12x12x12`, and `16x12x12` decisions are retained in batch manifests and inventory usage.
 
 ## Future supply forecasting requirement
 

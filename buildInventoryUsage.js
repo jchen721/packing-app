@@ -1,3 +1,5 @@
+const { classifyProduct } = require("./boxEngine");
+
 /*
 Change the value on the right to match the item name
 you use in the Google Sheet.
@@ -67,21 +69,46 @@ Maps packing groups to the box names in the inventory sheet.
 Each order in one of these groups uses one box.
 */
 const BOX_GROUP_MAP = {
+  "8x6x4": "6x6x6 Boxes",
   "6x6x6": "6x6x6 Boxes",
   "7x5x5": "7x5x5 Boxes",
   "8x8x4": "8x8x4 Boxes",
   "8x8x8": "8x8x8 Boxes",
+  "11x11x3": "11x11x3 Boxes",
   "11x11x5": "11x11x5 Boxes",
   "11x11x7": "11x11x7 Boxes",
   "11x11x9": "11x11x9 Boxes",
+  "12x12x12": "12x12x12 Boxes",
   "13x10x4": "13x10x4 Boxes",
   "13x10x6": "13x10x6 Boxes",
   "13x10x8": "13x10x8 Boxes",
   "16x12x4": "16x12x4 Boxes",
   "16x12x6": "16x12x6 Boxes",
   "16x12x8": "16x12x8 Boxes",
+  "16x12x12": "16x12x12 Boxes",
+  "24x12x4": "24x12x4 Boxes",
+  "24x12x6": "24x12x6 Boxes",
   "24 Box": "24 Boxes"
 };
+
+const BUBBLE_MAILER_ITEM = "Bubble Mailers";
+const BUBBLE_WRAP_ITEM = "Bubble Wrap Pieces";
+
+function bubbleWrapPiecesPerUnit(productName) {
+  const name = String(productName || "").normalize("NFKC").toLowerCase();
+  if (classifyProduct(productName) === "box24") return 4;
+  if (/\b(?:spc|super\s+premium\s+collection)\b/.test(name)) return 3;
+  if (/\b(?:upc|ultra\s+premium\s+collection)\b/.test(name)) return 4;
+  if (/\b(?:etb|elite\s+trainer\s+box)\b/.test(name)) return 2;
+  if (/\btins?\b/.test(name)) return 1;
+  return 0;
+}
+
+function orderUsesBubbleMailer(order = {}) {
+  const products = order.products || [];
+  if (normalizePackingGroup(order.exactPackingGroup) !== "packsonly" || !products.length) return false;
+  return products.every(product => ["normalPacks", "sleevedPacks"].includes(classifyProduct(product.productName)));
+}
 
 function buildInventoryUsageFromOrders(orders) {
   if (!Array.isArray(orders)) {
@@ -95,7 +122,10 @@ function buildInventoryUsageFromOrders(orders) {
       const originalName = String(product.productName || "").trim();
       const inventoryName = normalizeProductName(originalName);
       addUsage(usage, inventoryName, product.physicalQty);
+      addUsage(usage, BUBBLE_WRAP_ITEM, bubbleWrapPiecesPerUnit(originalName) * Number(product.physicalQty));
     }
+
+    if (orderUsesBubbleMailer(order)) addUsage(usage, BUBBLE_MAILER_ITEM, 1);
 
     const normalizedGroup = normalizePackingGroup(order.exactPackingGroup);
     const matchingGroup = Object.keys(BOX_GROUP_MAP).find(
@@ -143,5 +173,7 @@ function convertUsageToArray(usage) {
 module.exports = {
   buildInventoryUsageFromOrders,
   convertUsageToArray,
-  normalizeProductName
+  normalizeProductName,
+  bubbleWrapPiecesPerUnit,
+  orderUsesBubbleMailer
 };

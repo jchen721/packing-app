@@ -45,7 +45,8 @@ async function appendWorkerLog(input) {
 
 async function readSharedWorkerLogs(batchId) {
   const sheets = await getSheetsClient();
-  await ensureWorkerSheet(sheets);
+  const metadata = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID, fields: "sheets.properties.title" });
+  if (!metadata.data.sheets.some(sheet => sheet.properties.title === SHEET_NAME)) return [];
   const response = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `'${SHEET_NAME}'!A2:G` });
   const logs = rowsToWorkerLogs(response.data.values || []);
   return batchId ? logs.filter(log => log.batchId === batchId) : logs;

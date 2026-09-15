@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { createBatchManifest, saveBatchFiles, findBatch } = require("../batchService");
-const { createConfirmationService } = require("../dailyInventoryUpdate");
+const { createConfirmationService, selectTrackedInventoryUsage, validateResolvedBoxUsage } = require("../dailyInventoryUpdate");
 
 function sampleOrders() {
   return [{ sourceFile: "orders.pdf", orderId: "100", trackingNumber: "200", finalGroup: "8x8x4", exactPackingGroup: "8x8x4", products: [
@@ -75,7 +75,39 @@ test("successful confirmation updates inventory before marking processed", async
   const service = createConfirmationService({ outputsDir: fixture.outputsDir, registry, inventoryGateway: { async subtractInventory(usage, metadata) { received = { usage, metadata }; return { success: true }; } } });
   const result = await service.confirm(fixture.manifest.batch.batchId, { user: "Alice" });
   assert.equal(result.success, true); assert.equal(registry.record.batchId, fixture.manifest.batch.batchId);
-  assert.equal(received.metadata.user, "Alice"); assert.equal(received.usage.length, 2);
+  assert.equal(received.metadata.user, "Alice"); assert.equal(received.usage.length, 3);
+});
+
+test("box-only confirmation scope preserves products for audit but deducts only packing boxes", () => {
+  const usage = [
+    { item: "Perfect Order ETB", quantity: 4 },
+    { item: "8x8x4 Boxes", quantity: 2 },
+    { item: "24 Boxes", quantity: 1 }
+  ];
+  assert.deepEqual(selectTrackedInventoryUsage(usage, "boxes"), [usage[1], usage[2]]);
+  assert.deepEqual(selectTrackedInventoryUsage(usage, "all"), usage);
+});
+
+test("24-series inventory stays blocked until its exact physical height is approved", () => {
+  assert.throws(() => validateResolvedBoxUsage([{ item: "24 Boxes", quantity: 1 }]), /24x12x4 or 24x12x6/);
+  assert.equal(validateResolvedBoxUsage([{ item: "16x12x8 Boxes", quantity: 1 }]), true);
+});
+
+test("a box-only batch with no shipping box can still be finalized without an inventory write", async () => {
+  const fixture = makeBatch();
+  const registry = memoryRegistry();
+  let calls = 0;
+  const service = createConfirmationService({
+    outputsDir: fixture.outputsDir,
+    registry,
+    selectUsage: () => [],
+    allowEmptyUsage: true,
+    inventoryGateway: { async subtractInventory() { calls++; } }
+  });
+  const result = await service.confirm(fixture.manifest.batch.batchId, { user: "Alice" });
+  assert.equal(calls, 0);
+  assert.deepEqual(result.itemsDeducted, []);
+  assert.equal(registry.record.batchId, fixture.manifest.batch.batchId);
 });
 
 test("batch preview shows whether shared inventory covers every deduction", async () => {
@@ -85,13 +117,13 @@ test("batch preview shows whether shared inventory covers every deduction", asyn
     outputsDir: fixture.outputsDir,
     registry,
     inventoryGateway: {
-      async readInventory() { return [{ item: "Perfect Order ETB", quantity: 3, category: "Pokémon Products" }, { item: "8x8x4 Boxes", quantity: 2, category: "Warehouse Supplies" }]; },
+      async readInventory() { return [{ item: "Perfect Order ETB", quantity: 3, category: "Pokémon Products" }, { item: "Bubble Wrap Pieces", quantity: 20, category: "Warehouse Supplies" }, { item: "8x8x4 Boxes", quantity: 2, category: "Warehouse Supplies" }]; },
       async subtractInventory() { throw new Error("not used"); }
     }
   });
   const preview = await service.preview(fixture.manifest.batch.batchId);
   assert.equal(preview.inventoryReady, true);
-  assert.deepEqual(preview.inventoryAvailability.map(row => row.newQuantity), [2, 1]);
+  assert.deepEqual(preview.inventoryAvailability.map(row => row.newQuantity), [2, 18, 1]);
 });
 
 test("duplicate confirmation is prevented before inventory mutation", async () => {

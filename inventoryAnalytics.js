@@ -12,7 +12,7 @@ function enrichInventory(inventory) {
   return inventory.map(item => ({
     ...item,
     category: inventoryCategory(item),
-    stockStatus: item.quantity <= 0 ? "Out of stock" : item.lowStockLevel > 0 && item.quantity <= item.lowStockLevel ? "Low stock" : "In stock"
+    stockStatus: item.quantityVerified === false ? "Count required" : item.quantity <= 0 ? "Out of stock" : item.lowStockLevel > 0 && item.quantity <= item.lowStockLevel ? "Low stock" : "In stock"
   }));
 }
 
@@ -20,9 +20,10 @@ function summarizeInventory(inventory) {
   const items = enrichInventory(inventory);
   return {
     totalItems: items.length,
-    totalUnits: items.reduce((sum, item) => sum + item.quantity, 0),
+    totalUnits: items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
     lowStockItems: items.filter(item => item.stockStatus === "Low stock").length,
     outOfStockItems: items.filter(item => item.stockStatus === "Out of stock").length,
+    countRequiredItems: items.filter(item => item.stockStatus === "Count required").length,
     items
   };
 }

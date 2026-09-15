@@ -3,6 +3,7 @@ const { google } = require("googleapis");
 const config = require("./appConfig");
 const { DEFAULT_SCHEMAS, createSchemaService } = require("./googleSheetsSchema");
 const { buildInventoryAvailability, assertInventoryAvailability } = require("./inventoryAvailability");
+const { BOX_INVENTORY_SHEET_NAME, canonicalTrackedPackingSupplyName } = require("./boxInventoryCatalog");
 
 // CHANGE these two values.
 const SPREADSHEET_ID = config.spreadsheetId;
@@ -32,7 +33,7 @@ const inventorySchemaService = createSchemaService({
   spreadsheetId: SPREADSHEET_ID,
   schemas: {
     [INVENTORY_SHEET_NAME]: DEFAULT_SCHEMAS[INVENTORY_SHEET_NAME],
-    [SUPPLIES_SHEET_NAME]: DEFAULT_SCHEMAS[SUPPLIES_SHEET_NAME],
+    [BOX_INVENTORY_SHEET_NAME]: DEFAULT_SCHEMAS[BOX_INVENTORY_SHEET_NAME],
     [HISTORY_SHEET_NAME]: DEFAULT_SCHEMAS[HISTORY_SHEET_NAME]
   }
 });
@@ -45,6 +46,11 @@ async function ensureInventorySchemas() {
 
 async function ensureHistorySheet(sheets) {
   await ensureInventorySchemas();
+}
+
+async function hasSheet(sheets, title) {
+  const metadata = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID, fields: "sheets.properties.title" });
+  return metadata.data.sheets.some(sheet => sheet.properties.title === title);
 }
 
 async function ensureLockSheet(sheets) {
@@ -77,7 +83,7 @@ async function readLockRows(sheets) {
 
 async function readInventoryLocks(limit = 100) {
   const sheets = await getSheetsClient();
-  await ensureLockSheet(sheets);
+  if (!await hasSheet(sheets, LOCK_SHEET_NAME)) return [];
   const response = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `'${LOCK_SHEET_NAME}'!A2:G` });
   return rowsToInventoryLocks(response.data.values || []).reverse().slice(0, Math.max(1, Math.min(Number(limit) || 100, 500)));
 }
@@ -151,38 +157,51 @@ async function withInventoryLock(metadata, task) {
  * D: Reorder Amount
  */
 async function readInventory() {
-  await ensureInventorySchemas();
   const sheets = await getSheetsClient();
   const sources = [
     { sheetName: INVENTORY_SHEET_NAME, category: "Pokémon Products" },
-    { sheetName: SUPPLIES_SHEET_NAME, category: "Warehouse Supplies" }
+    { sheetName: BOX_INVENTORY_SHEET_NAME, category: "Warehouse Supplies", boxInventory: true }
   ];
-  const responses = await Promise.all(sources.map(source => sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `'${source.sheetName}'!A2:D` })));
-  const inventory = sources.flatMap((source, sourceIndex) => (responses[sourceIndex].data.values || [])
+  const responses = await Promise.all(sources.map(source => sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `'${source.sheetName}'!A2:J` })));
+  const loadedInventory = sources.flatMap((source, sourceIndex) => (responses[sourceIndex].data.values || [])
     .map((row, index) => ({ row, rowNumber: index + 2 }))
     .filter(entry => entry.row[0])
-    .map(({ row, rowNumber }) => ({
-      sheetName: source.sheetName,
-      rowNumber,
-      item: String(row[0]).trim(),
-      quantity: Number(row[1] || 0),
-      lowStockLevel: Number(row[2] || 0),
-      reorderAmount: Number(row[3] || 0),
-      category: source.category
-    })));
+    .map(({ row, rowNumber }) => {
+      const rawQuantity = String(row[1] ?? "").trim();
+      const numericQuantity = Number(rawQuantity);
+      const quantityVerified = !source.boxInventory || (rawQuantity !== "" && Number.isFinite(numericQuantity) && numericQuantity >= 0);
+      return {
+        sheetName: source.sheetName,
+        rowNumber,
+        item: String(row[0]).trim(),
+        quantity: quantityVerified ? Number(row[1] || 0) : null,
+        quantityVerified,
+        lowStockLevel: Number(row[2] || 0),
+        reorderAmount: Number(row[3] || 0),
+        category: source.category
+      };
+    }));
+  const boxInventoryNames = new Set(loadedInventory
+    .filter(row => row.sheetName === BOX_INVENTORY_SHEET_NAME)
+    .map(row => canonicalTrackedPackingSupplyName(row.item))
+    .filter(Boolean));
+  // Preserve legacy supply rows in Inventory, but use Box Inventory as the one
+  // operational source of truth when the same tracked supply exists there.
+  const inventory = loadedInventory.filter(row => row.sheetName === BOX_INVENTORY_SHEET_NAME ||
+    !boxInventoryNames.has(canonicalTrackedPackingSupplyName(row.item)));
   const seen = new Set();
   const duplicates = [];
   for (const row of inventory) {
     const key = row.item.toLowerCase();
     if (seen.has(key)) duplicates.push(row.item); else seen.add(key);
   }
-  if (duplicates.length) throw new Error(`Inventory item names must be unique across Inventory and Warehouse Supplies: ${[...new Set(duplicates)].join(", ")}`);
+  if (duplicates.length) throw new Error(`Inventory item names must be unique across Inventory and Box Inventory: ${[...new Set(duplicates)].join(", ")}`);
   return inventory;
   }
 
 async function readInventoryHistory(limit = 500) {
-  await ensureInventorySchemas();
   const sheets = await getSheetsClient();
+  if (!await hasSheet(sheets, HISTORY_SHEET_NAME)) return [];
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: `'${HISTORY_SHEET_NAME}'!A2:J`,
@@ -199,8 +218,8 @@ async function readInventoryHistory(limit = 500) {
 async function readInventoryHistoryByTransactionId(transactionId) {
   const wanted = String(transactionId || "").trim();
   if (!wanted) throw new Error("Transaction ID is required.");
-  await ensureInventorySchemas();
   const sheets = await getSheetsClient();
+  if (!await hasSheet(sheets, HISTORY_SHEET_NAME)) return [];
   const response = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `'${HISTORY_SHEET_NAME}'!A2:J` });
   return (response.data.values || []).filter(row => String(row[1] || "").trim() === wanted).map(row => ({
     timestamp: row[0] || "", batchId: row[1] || "", item: row[2] || "", category: row[3] || "",
@@ -249,6 +268,7 @@ async function subtractInventoryUnlocked(usage, metadata, sheets) {
   const updates = [];
   const rollbackUpdates = [];
   const historyRows = [];
+  const changes = [];
   const missingItems = [];
 
   for (const usedItem of usage) {
@@ -295,11 +315,20 @@ async function subtractInventoryUnlocked(usage, metadata, sheets) {
       String(metadata.reason || "Packing usage"),
       String(metadata.user || "Unknown user"),
     ]);
+    changes.push({
+      item: itemName,
+      category: inventoryItem.category,
+      previousQuantity,
+      quantityChanged: -quantityUsed,
+      newQuantity,
+      lowStockLevel: inventoryItem.lowStockLevel,
+      reorderAmount: inventoryItem.reorderAmount
+    });
   }
 
   if (missingItems.length > 0) {
     throw new Error(
-      `These items were not found in Inventory or Warehouse Supplies: ${missingItems.join(
+      `These items were not found in Inventory or Box Inventory: ${missingItems.join(
         ", "
       )}`
     );
@@ -347,6 +376,7 @@ async function subtractInventoryUnlocked(usage, metadata, sheets) {
   return {
     success: true,
     itemsUpdated: updates.length,
+    changes
   };
 }
 
@@ -424,7 +454,7 @@ async function addInventoryUnlocked(receivedItems, metadata, sheets) {
 
   if (missingItems.length > 0) {
     throw new Error(
-      `These items were not found in Inventory or Warehouse Supplies: ${missingItems.join(
+      `These items were not found in Inventory or Box Inventory: ${missingItems.join(
         ", "
       )}`
     );

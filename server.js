@@ -28,6 +28,7 @@ const { OPERATIONS_SCHEMAS, createSchemaService } = require("./googleSheetsSchem
 const { createSupabaseClients, createSupabaseHealthService } = require("./supabaseClient");
 const { createSupabaseOperationsMirror } = require("./supabaseOperationsMirror");
 const { createSupabaseBatchStorage } = require("./supabaseBatchStorage");
+const { createLowStockNotifier } = require("./emailNotifier");
 
 const app = express();
 const upload = multer({
@@ -63,6 +64,7 @@ const inventoryReconciliationService = createInventoryReconciliationService({
   sharedLock: withInventoryLock,
   historyAppender: appendInventoryReconciliationHistory
 });
+const lowStockNotifier = createLowStockNotifier();
 
 function loadPackingStorage() {
   return analyzePackingStorage(path.join(__dirname, "outputs"), {
@@ -105,6 +107,15 @@ async function safeSupabaseMirror(operation) {
   } catch (error) {
     console.error("Supabase mirror failed without changing the primary Google Sheets workflow:", error.message);
     return { enabled: true, mirrored: false, warning: error.message };
+  }
+}
+
+async function safeLowStockEmail(changes, metadata) {
+  try {
+    return await lowStockNotifier.sendForChanges(changes, metadata);
+  } catch (error) {
+    console.error("Low-stock email failed after the inventory transaction completed:", error.message);
+    return { enabled: true, sent: false, warning: error.message };
   }
 }
 
@@ -186,6 +197,8 @@ app.get("/system/status", async (req, res) => {
         ? ["PACKING", "INVENTORY_READ", "INVENTORY_WRITE", "WORKER_TRACKING"]
         : ["PACKING", "INVENTORY_READ", "WORKER_TRACKING"],
       inventoryWritesEnabled: config.inventoryWritesEnabled,
+      inventoryTrackingScope: config.inventoryTrackingScope,
+      lowStockEmail: { enabled: config.lowStockEmail.enabled, configured: config.lowStockEmail.configured },
       operatingMode: config.inventoryWritesEnabled ? "PACKING_AND_INVENTORY" : "PACKING_ONLY"
     });
   } catch (error) {
@@ -258,11 +271,12 @@ app.post("/batches/:batchId/confirm", async (req, res) => {
     const user = String(req.body.user || "").trim();
     if (!user) return res.status(400).json({ error: "User is required." });
     const result = await confirmDailyInventoryUpdate(req.params.batchId, { user, reason: "Confirmed packing batch" });
-    const [batchMirror, inventoryMirror] = await Promise.all([
+    const [batchMirror, inventoryMirror, lowStockEmail] = await Promise.all([
       safeSupabaseMirror(() => mirrorBatchToSupabase(req.params.batchId)),
-      safeSupabaseMirror(() => mirrorInventoryToSupabase())
+      safeSupabaseMirror(() => mirrorInventoryToSupabase()),
+      safeLowStockEmail(result.updateResult?.changes || [], { batchId: req.params.batchId, user })
     ]);
-    res.json({ ...result, supabaseMirror: { batch: batchMirror, inventory: inventoryMirror } });
+    res.json({ ...result, lowStockEmail, supabaseMirror: { batch: batchMirror, inventory: inventoryMirror } });
   } catch (error) {
     res.status(/already/i.test(error.message) ? 409 : 500).json({ error: error.message });
   }

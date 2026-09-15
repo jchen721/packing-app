@@ -10,7 +10,7 @@ const { SHEET_NAME: PICKING_SHEET, HEADERS: PICKING_HEADERS } = require("../pick
 test("only packing and inventory Google Sheet schemas remain active", () => {
   assert.deepEqual(Object.keys(DEFAULT_SCHEMAS).sort(), [
     "Inventory", "Inventory History", "Inventory Locks", "Packing Activity",
-    "Packing Batches", "Warehouse Supplies", "packing List"
+    "Box Inventory", "Packing Batches", "Warehouse Supplies", "packing List"
   ].sort());
   assert.deepEqual(PICKING_HEADERS, DEFAULT_SCHEMAS[PICKING_SHEET]);
   assert.deepEqual(BATCH_HEADERS, DEFAULT_SCHEMAS[BATCH_SHEET]);

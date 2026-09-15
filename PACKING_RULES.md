@@ -1769,3 +1769,61 @@ These clarifications were supplied after the original master specification:
 8. The downloadable worker ZIP contains only the grouped PDFs that need to be printed. Internal batch JSON remains in the private run directory. After verification passes, physical item totals continue to update the Google Sheets packing List with unchecked checklist boxes.
 
 9. TikTok product-name variants that represent the same physical item must be combined before writing the picking checklist or inventory usage. Preserve raw names in batch audit data. Approved canonical mappings include both First Partner Series 3 names in one row, all Random Chinese/CN/JP/KR Booster Pack variants in one row, and Pitch Black Booster Pack bracket/x1 variants in one row. AI may recommend future mappings, but a manager must approve them before automatic merging.
+
+10. Long products in the 24-series family, including Blooming Waters and the other approved products of the same physical size, use 24x12x4 when no ETB is present. If one or more ETBs are included with the long product, the ETB height is the deciding factor and the order uses 24x12x6. Both exact sizes remain consolidated into `24_Box.pdf` for workers.
+
+11. A verified Packs Only order consumes one bubble mailer. Bubble-wrap consumption is measured in pieces: each ETB uses 2 pieces, each actual tin uses 1 piece, each SPC/Super Premium Collection uses 3 pieces, each UPC/Ultra Premium Collection uses 4 pieces, and each approved long 24-series product such as Blooming Waters uses 4 pieces. Booster Bundles are not tins for this supply calculation unless the owner later approves that rule.
+
+==================================================
+OWNER CLARIFICATIONS — 2026-09-15 MANAGER BOX CHART
+==================================================
+
+These newer rules replace older rules wherever they conflict:
+
+1. A legacy `8x6x4` result uses the replacement `6x6x6` box and existing `6_Box.pdf` worker group.
+
+2. One standard non-Japanese Booster Box continues to use `7x5x5`. One clearly named Japanese or JP Booster Box uses `8x8x4`. Multiple or mixed Booster Box orders remain `Needs Review`.
+
+3. The current ETB ladder is:
+
+- 1 ETB -> `8x8x4`
+- 2 ETBs -> `8x8x8`
+- 2 ETBs + Booster Bundle -> `11x11x7`
+- 3 ETBs -> `11x11x7`
+- 4 or 5 ETBs -> `12x12x12`
+- 6 ETBs -> `16x12x8`
+- 7 or more ETBs -> `Needs Review`
+
+4. The current poster ladder is:
+
+- 1 poster -> `11x11x3`
+- 2 posters -> `11x11x5`
+- 1 poster + 1 ETB -> `11x11x5`
+- 2 posters + 1 ETB -> `11x11x7`
+- poster + 2 ETBs -> `11x11x9`
+- poster + 3 ETBs -> `11x11x9`
+- poster + 4 or 5 ETBs -> `12x12x12`
+
+Other poster quantities or combinations remain `Needs Review` unless another explicit rule applies.
+
+5. The current normal collection/large-premium ladder is:
+
+- 1 UPC or normal collection box -> `16x12x4`
+- 1 UPC + 1 normal collection box -> `16x12x6`
+- 1 normal collection box + 1 ETB -> `13x10x6`
+- 1 normal collection box + 2 ETBs -> `16x12x6`
+- 2 UPCs -> `16x12x8`
+- 1 UPC + 2 ETBs -> `16x12x8`
+- 3 UPCs -> `16x12x12`
+- 2 UPCs + 2 ETBs -> `16x12x12`
+- 2 Victini collection boxes -> `13x10x4`
+
+Unlisted collection quantities and mixed large-product combinations remain `Needs Review`. Named special physical families still take precedence: Blooming Waters-sized long products stay in the 24-series, First Partner keeps Pokémon Day behavior, Mega-family products keep their approved 13/16 rules, and other documented exceptions are not converted into generic collection boxes.
+
+6. `12x12x12` is consolidated into `11_Box.pdf` for the existing worker workflow. Exact internal box sizes remain in the batch manifests and packing-supply deductions.
+
+7. No packing rule is assigned to `18x18x12` yet.
+
+8. First Partner Series 2 and First Partner Series 3 use the existing Pokémon Day packing behavior. More than one First Partner collection is no longer a reason by itself for `Needs Review`: without an ETB the order uses `8x8x4`; with one ETB it uses `8x8x8`; with two ETBs it uses `11x11x5`. Small packs, tins, and Booster Bundles do not by themselves increase this established box.
+
+9. `Legendary Warriors Premium Collection` and `Unova Premium Collection - Heavy Hitters` are the same long physical family as Blooming Waters. They use `24x12x4` without an ETB and `24x12x6` when one or more ETBs add height. Multiple items from this approved 24-series family continue to receive one exact 24-series classification because the owner requires one box classification per order.

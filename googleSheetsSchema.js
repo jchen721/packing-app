@@ -1,6 +1,9 @@
+const { BOX_INVENTORY_SHEET_NAME, BOX_INVENTORY_HEADERS } = require("./boxInventoryCatalog");
+
 const DEFAULT_SCHEMAS = Object.freeze({
   "Inventory": ["Item", "Quantity", "Low Stock Level", "Reorder Amount"],
   "Warehouse Supplies": ["Item", "Quantity", "Low Stock Level", "Reorder Amount"],
+  [BOX_INVENTORY_SHEET_NAME]: BOX_INVENTORY_HEADERS,
   "packing List": ["ITEM", "QUANTITY", "CHECKLIST"],
   "Packing Batches": ["Created At", "Batch ID", "Order Key", "Status", "User", "Attempt ID", "Updated At"],
   "Packing Activity": ["Timestamp", "Batch ID", "Order ID", "Worker", "Action", "Buyer Nickname", "Packing Group"],

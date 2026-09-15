@@ -9,6 +9,19 @@ test("7x5x5 keeps the existing consolidated small-box PDF workflow", () => {
   assert.equal(getFinalGroup("7x5x5"), "6_Box");
 });
 
+test("legacy 8x6x4 results use the replacement 6x6x6 worker group", () => {
+  assert.equal(getFinalGroup("8x6x4"), "6_Box");
+});
+
+test("both exact 24-inch heights keep one worker-facing PDF", () => {
+  assert.equal(getFinalGroup("24x12x4"), "24_Box");
+  assert.equal(getFinalGroup("24x12x6"), "24_Box");
+});
+
+test("12x12x12 stays in the consolidated 11-family worker PDF", () => {
+  assert.equal(getFinalGroup("12x12x12"), "11_Box");
+});
+
 function readZipEntryNames(buffer) {
   const names = [];
   const centralDirectorySignature = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
