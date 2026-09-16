@@ -4,6 +4,10 @@ function cleanText(text) {
   
   function classifyProduct(productName) {
     const name = cleanText(productName);
+
+    // TikTok numbered mystery-box lines stay in Needs Review for workers, but
+    // use a separate approved 7x5x5 inventory estimate per order.
+    if (/\bbox\s*#\s*\d+\b/.test(name)) return "numberedReviewBoxes";
   
     // 24 Box products
     if (name.includes("blooming water")) return "box24";
@@ -123,12 +127,14 @@ function cleanText(text) {
       boosterBundles = 0,
       collectionBoxes = 0,
       victiniCollections = 0,
+      numberedReviewBoxes = 0,
       deluxePin,
       box24,
       unknown
     } = counts;
   
     if (unknown > 0) return "Needs Review";
+    if (numberedReviewBoxes > 0) return "Needs Review";
 
     // Only the single standard Booster Box rule is currently approved.
     // Multiple or mixed Booster Box orders remain in Needs Review until the
@@ -240,8 +246,14 @@ function cleanText(text) {
   
     return "Needs Review";
   }
+
+  function chooseInventoryPackingGroup(counts, exactPackingGroup = chooseBox(counts)) {
+    if (Number(counts?.numberedReviewBoxes || 0) > 0) return "7x5x5";
+    return exactPackingGroup;
+  }
   
   module.exports = {
     classifyProduct,
-    chooseBox
+    chooseBox,
+    chooseInventoryPackingGroup
   };

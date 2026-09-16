@@ -1,9 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { classifyProduct, chooseBox } = require("../boxEngine");
+const { classifyProduct, chooseBox, chooseInventoryPackingGroup } = require("../boxEngine");
 
 function counts(overrides = {}) {
-  return { normalPacks: 0, sleevedPacks: 0, etbs: 0, tins: 0, posters: 0, pokemonDays: 0, firstPartners: 0, megaItems: 0, largePremiums: 0, boosterBoxes: 0, japaneseBoosterBoxes: 0, boosterBundles: 0, collectionBoxes: 0, victiniCollections: 0, deluxePin: 0, box24: 0, unknown: 0, ...overrides };
+  return { normalPacks: 0, sleevedPacks: 0, etbs: 0, tins: 0, posters: 0, pokemonDays: 0, firstPartners: 0, megaItems: 0, largePremiums: 0, boosterBoxes: 0, japaneseBoosterBoxes: 0, boosterBundles: 0, collectionBoxes: 0, victiniCollections: 0, numberedReviewBoxes: 0, deluxePin: 0, box24: 0, unknown: 0, ...overrides };
 }
 
 test("existing product classification remains intact", () => {
@@ -118,4 +118,11 @@ test("two Victini collection boxes use the approved 13x10x4 rule", () => {
   assert.equal(classifyProduct("Victini Illustration Collection Box"), "victiniCollections");
   assert.equal(chooseBox(counts({ victiniCollections: 2 })), "13x10x4");
   assert.equal(chooseBox(counts({ victiniCollections: 1 })), "Needs Review");
+});
+
+test("numbered BOX orders stay in review but estimate one 7x5x5 supply", () => {
+  assert.equal(classifyProduct("\u0000 BOX # 167"), "numberedReviewBoxes");
+  const orderCounts = counts({ numberedReviewBoxes: 1, normalPacks: 3 });
+  assert.equal(chooseBox(orderCounts), "Needs Review");
+  assert.equal(chooseInventoryPackingGroup(orderCounts), "7x5x5");
 });

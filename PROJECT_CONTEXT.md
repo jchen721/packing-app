@@ -160,6 +160,8 @@ First Partner Series 2 and Series 3 use the existing Pokémon Day behavior, incl
 
 `12x12x12` remains consolidated into `11_Box.pdf` so this new exact supply estimate does not add another worker-facing PDF. Exact `12x12x12` and `16x12x12` decisions are retained in batch manifests and inventory usage. The old `11x11x3` mapping remains only as a safety block for stale batches created before the correction; those PDFs must be reprocessed.
 
+Numbered TikTok mystery-box lines such as `BOX # 167` deliberately remain in `Needs_Review.pdf`. For supply estimation only, each verified order containing a numbered `BOX #` line consumes one `7x5x5 Boxes`. The separate `inventoryPackingGroup` field preserves this distinction in the batch audit; it must never move these orders out of worker review.
+
 ## Future supply forecasting requirement
 
 Future exact-box rules are also intended to estimate packing-supply consumption without changing worker PDF grouping. After verified starting quantities are available, a later phase may:

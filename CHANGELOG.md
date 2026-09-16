@@ -7,6 +7,7 @@ This file records important behavioral and architectural decisions. It is not a 
 - Corrected the manager's `1 poster // eliminate` instruction: `11x11x3` is not stocked, and a single poster now uses `11x11x5`.
 - Kept the retired `11x11x3` inventory mapping only to block stale batches safely; affected PDFs must be reprocessed before confirmation.
 - Made approved box-only inventory mode the built-in default so a missing `.env` cannot silently disable warehouse deductions; an explicit `INVENTORY_WRITES_ENABLED=false` remains available as an emergency pause.
+- Kept numbered TikTok `BOX #` orders in `Needs_Review.pdf` while recording a separate audited estimate of one `7x5x5` box per verified order for confirmed supply deductions.
 
 ## 2026-09-15
 

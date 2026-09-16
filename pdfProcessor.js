@@ -6,7 +6,7 @@ const { PDFDocument } = require("pdf-lib");
 let archiver = require("archiver");
 if (archiver.default) archiver = archiver.default;
 
-const { classifyProduct, chooseBox } = require("./boxEngine");
+const { classifyProduct, chooseBox, chooseInventoryPackingGroup } = require("./boxEngine");
 const { updatePickingChecklist } = require("./pickingChecklist");
 const { createBatchManifest, saveBatchFiles } = require("./batchService");
 
@@ -88,6 +88,7 @@ function countCategories(products) {
     boosterBundles: 0,
     collectionBoxes: 0,
     victiniCollections: 0,
+    numberedReviewBoxes: 0,
     deluxePin: 0,
     box24: 0,
     unknown: 0
@@ -279,9 +280,11 @@ async function processPDFs(filePaths) {
       const categoryCounts = countCategories(products);
 
       let exactPackingGroup = chooseBox(categoryCounts);
+      let inventoryPackingGroup = chooseInventoryPackingGroup(categoryCounts, exactPackingGroup);
 
       if (!quantityMatches || products.length === 0) {
         exactPackingGroup = "Needs Review";
+        inventoryPackingGroup = null;
       }
 
       const finalGroup = getFinalGroup(
@@ -311,6 +314,7 @@ async function processPDFs(filePaths) {
         parsedPhysicalQtyTotal,
         quantityMatches,
         exactPackingGroup,
+        inventoryPackingGroup,
         finalGroup,
         categoryCounts,
         products

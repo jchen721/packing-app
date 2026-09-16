@@ -20,6 +20,7 @@ function createBatchId(orders) {
     orderId: order.orderId,
     trackingNumber: order.trackingNumber,
     exactPackingGroup: order.exactPackingGroup,
+    inventoryPackingGroup: order.inventoryPackingGroup,
     products: order.products
   })).sort((a, b) => {
     const aKey = `${a.orderId || ""}:${a.trackingNumber || ""}`;

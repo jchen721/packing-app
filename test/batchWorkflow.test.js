@@ -50,6 +50,13 @@ test("batch ID ignores temporary source names and upload order", () => {
   assert.equal(make(reversed), make(reordered));
 });
 
+test("batch ID binds the audited inventory packing estimate", () => {
+  const orders = sampleOrders().map(order => ({ ...order, exactPackingGroup: "Needs Review", inventoryPackingGroup: null }));
+  const withoutEstimate = createBatchManifest({ runId: "1", orders, summary: {}, verification: { totalOutputPages: 2 }, zipPath: "x.zip" }).batch.batchId;
+  const withEstimate = createBatchManifest({ runId: "2", orders: orders.map(order => ({ ...order, inventoryPackingGroup: "7x5x5" })), summary: {}, verification: { totalOutputPages: 2 }, zipPath: "x.zip" }).batch.batchId;
+  assert.notEqual(withoutEstimate, withEstimate);
+});
+
 test("latest batch lookup skips incomplete runs and uses manifest creation time", () => {
   const outputsDir = fs.mkdtempSync(path.join(os.tmpdir(), "latest-packing-test-"));
   function saveComplete(runId, orderId, createdAt) {

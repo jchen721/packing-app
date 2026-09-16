@@ -129,7 +129,12 @@ function buildInventoryUsageFromOrders(orders) {
 
     if (orderUsesBubbleMailer(order)) addUsage(usage, BUBBLE_MAILER_ITEM, 1);
 
-    const normalizedGroup = normalizePackingGroup(order.exactPackingGroup);
+    // New batches may retain Needs Review for workers while carrying a separate
+    // approved inventory estimate. Legacy batches fall back to their exact group.
+    const inventoryPackingGroup = Object.prototype.hasOwnProperty.call(order, "inventoryPackingGroup")
+      ? order.inventoryPackingGroup
+      : order.exactPackingGroup;
+    const normalizedGroup = normalizePackingGroup(inventoryPackingGroup);
     const matchingGroup = Object.keys(BOX_GROUP_MAP).find(
       boxGroup => normalizePackingGroup(boxGroup) === normalizedGroup
     );

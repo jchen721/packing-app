@@ -21,6 +21,20 @@ test("legacy 8x6x4 result consumes the replacement 6x6x6 supply", () => {
   assert.deepEqual(usage, { "6x6x6 Boxes": 1 });
 });
 
+test("numbered review orders deduct 7x5x5 without leaving Needs Review", () => {
+  const usage = buildInventoryUsageFromOrders([{
+    exactPackingGroup: "Needs Review",
+    inventoryPackingGroup: "7x5x5",
+    products: [{ productName: "\u0000 BOX # 167", physicalQty: 1 }]
+  }]);
+  assert.deepEqual(usage, { "\u0000 BOX # 167": 1, "7x5x5 Boxes": 1 });
+});
+
+test("ordinary Needs Review orders do not guess an inventory box", () => {
+  const usage = buildInventoryUsageFromOrders([{ exactPackingGroup: "Needs Review", inventoryPackingGroup: null, products: [] }]);
+  assert.deepEqual(usage, {});
+});
+
 test("temporary booster-box rule consumes one 7x5x5 supply", () => {
   const usage = buildInventoryUsageFromOrders([{ exactPackingGroup: "7x5x5", products: [
     { productName: "S&V Chasing Glory Together Booster Box (Chinese)", physicalQty: 1 }
