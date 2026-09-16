@@ -508,6 +508,92 @@ async function addInventory(receivedItems, metadata = {}) {
   return withInventoryLock({ operation: `RECEIPT:${metadata.receiptId || "manual"}`, user: metadata.user }, sheets => addInventoryUnlocked(receivedItems, metadata, sheets));
 }
 
+function reversalTransactionId(sourceTransactionId) {
+  const source = String(sourceTransactionId || "").trim();
+  if (!source || source.length > 200 || source.startsWith("reversal:")) throw new Error("Choose a valid original inventory transaction.");
+  return `reversal:${source}`;
+}
+
+function buildInventoryReversal(sourceTransactionId, sourceRows, inventory) {
+  const reversalId = reversalTransactionId(sourceTransactionId);
+  if (!Array.isArray(sourceRows) || sourceRows.length === 0) throw new Error("The original inventory transaction was not found.");
+  const unsupported = [...new Set(sourceRows.map(row => String(row.actionType || "").toUpperCase()).filter(type => !["DEDUCTION", "RECEIVED"].includes(type)))];
+  if (unsupported.length) throw new Error(`Only deduction or received transactions can be reversed. This transaction contains: ${unsupported.join(", ")}.`);
+  const inventoryMap = new Map((inventory || []).map(row => [String(row.item || "").trim().toLowerCase(), row]));
+  const grouped = new Map();
+  for (const row of sourceRows) {
+    const key = String(row.item || "").trim().toLowerCase();
+    if (!key || !Number.isFinite(Number(row.quantityChanged))) throw new Error("The original transaction contains invalid inventory history.");
+    const current = grouped.get(key) || { item: String(row.item).trim(), category: row.category, originalChange: 0 };
+    current.originalChange += Number(row.quantityChanged);
+    grouped.set(key, current);
+  }
+  const changes = [...grouped.values()].map(change => {
+    const current = inventoryMap.get(change.item.toLowerCase());
+    if (!current || current.quantityVerified === false || !Number.isFinite(Number(current.quantity))) throw new Error(`${change.item} is missing or does not have a verified current quantity.`);
+    const quantityChanged = -change.originalChange;
+    const previousQuantity = Number(current.quantity);
+    const newQuantity = previousQuantity + quantityChanged;
+    if (newQuantity < 0) throw new Error(`Reversing this transaction would make ${change.item} negative (${newQuantity}). Correct the stock or reverse a newer transaction first.`);
+    return { item: current.item, category: current.category, sheetName: current.sheetName, rowNumber: current.rowNumber, previousQuantity, quantityChanged, newQuantity };
+  });
+  if (!changes.length || changes.every(change => change.quantityChanged === 0)) throw new Error("The original transaction has no reversible quantity change.");
+  return { sourceTransactionId: String(sourceTransactionId).trim(), reversalTransactionId: reversalId, changes };
+}
+
+async function previewInventoryReversal(sourceTransactionId) {
+  const reversalId = reversalTransactionId(sourceTransactionId);
+  const [sourceRows, existingReversal, inventory] = await Promise.all([
+    readInventoryHistoryByTransactionId(sourceTransactionId),
+    readInventoryHistoryByTransactionId(reversalId),
+    readInventory()
+  ]);
+  if (existingReversal.length) throw new Error("This inventory transaction has already been reversed.");
+  return buildInventoryReversal(sourceTransactionId, sourceRows, inventory);
+}
+
+async function reverseInventoryTransaction(input = {}) {
+  const sourceTransactionId = String(input.transactionId || "").trim();
+  const user = String(input.user || "").trim();
+  const reason = String(input.reason || "").trim();
+  const reversalId = reversalTransactionId(sourceTransactionId);
+  if (!user) throw new Error("Manager name is required.");
+  if (reason.length < 5) throw new Error("Enter a clear reason for the reversal.");
+  return withInventoryLock({ operation: `REVERSAL:${sourceTransactionId}`, user }, async sheets => {
+    const [sourceRows, existingReversal, inventory] = await Promise.all([
+      readInventoryHistoryByTransactionId(sourceTransactionId),
+      readInventoryHistoryByTransactionId(reversalId),
+      readInventory()
+    ]);
+    if (existingReversal.length) throw new Error("This inventory transaction has already been reversed.");
+    const preview = buildInventoryReversal(sourceTransactionId, sourceRows, inventory);
+    const updates = preview.changes.map(change => ({ range: `'${change.sheetName}'!B${change.rowNumber}`, values: [[change.newQuantity]] }));
+    const rollbackUpdates = preview.changes.map(change => ({ range: `'${change.sheetName}'!B${change.rowNumber}`, values: [[change.previousQuantity]] }));
+    await sheets.spreadsheets.values.batchUpdate({ spreadsheetId: SPREADSHEET_ID, requestBody: { valueInputOption: "USER_ENTERED", data: updates } });
+    try {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `'${HISTORY_SHEET_NAME}'!A:J`,
+        valueInputOption: "USER_ENTERED",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: preview.changes.map(change => [
+          new Date().toISOString(), reversalId, change.item, change.category,
+          change.previousQuantity, change.quantityChanged, change.newQuantity,
+          "REVERSAL", `Reversal of ${sourceTransactionId}: ${reason}`, user
+        ]) }
+      });
+    } catch (historyError) {
+      try {
+        await sheets.spreadsheets.values.batchUpdate({ spreadsheetId: SPREADSHEET_ID, requestBody: { valueInputOption: "USER_ENTERED", data: rollbackUpdates } });
+      } catch (rollbackError) {
+        throw new Error(`Reversal history failed and inventory rollback also failed. Manual reconciliation is required. History error: ${historyError.message}; rollback error: ${rollbackError.message}`);
+      }
+      throw new Error(`Reversal history failed; inventory quantities were restored. ${historyError.message}`);
+    }
+    return { success: true, ...preview, user, reason };
+  });
+}
+
 function normalizeCatalogInput(input) {
   const item = String(input.item || "").trim(); const quantity = Number(input.quantity || 0);
   const lowStockLevel = Number(input.lowStockLevel || 0); const reorderAmount = Number(input.reorderAmount || 0);
@@ -609,6 +695,10 @@ module.exports = {
   withInventoryLock,
   subtractInventory,
   addInventory,
+  reversalTransactionId,
+  buildInventoryReversal,
+  previewInventoryReversal,
+  reverseInventoryTransaction,
   addInventoryItem,
   updateInventorySettings,
   appendInventoryReconciliationHistory,

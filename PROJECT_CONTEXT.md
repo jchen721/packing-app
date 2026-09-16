@@ -117,6 +117,7 @@ Supabase is optional and currently serves as a mirror for structured operational
 
 - **Packing:** PDF upload, parsing, verification, box selection, batch review, grouped PDFs, ZIP download, and proposed inventory usage.
 - **Inventory:** read current products and supplies; confirmed box/supply deductions and existing-item receipts are active. Permanent writes can still be paused explicitly with `INVENTORY_WRITES_ENABLED=false`.
+- **Manager inventory undo:** preview and reverse a complete deduction or receipt transaction. The original history remains intact, a new `REVERSAL` transaction is recorded, and the same transaction cannot be reversed twice.
 - **Worker screen:** shows batch orders and records worker start/done/issue activity. It does not generate files or change inventory.
 
 Livestream analytics, TikTok synchronization, set building, forecasting, and AI tools are not active. Do not restore or expand them unless the owner starts a separate requested phase.

@@ -80,6 +80,13 @@ test("packing-only mode blocks every permanent inventory mutation", async () => 
   const reconciliation = await inject({ url: "/inventory/reconciliation/confirm", method: "POST", headers: { "content-type": "application/json", "content-length": "2" }, body: "{}" });
   assert.equal(reconciliation.status, 503);
   assert.match(JSON.parse(reconciliation.body).error, /inventory changes are disabled/i);
+
+  const reversalBody = JSON.stringify({ transactionId: "batch-1", user: "QA", reason: "Test undo" });
+  for (const url of ["/inventory/reversal/preview", "/inventory/reversal/confirm"]) {
+    const reversal = await inject({ url, method: "POST", headers: { "content-type": "application/json", "content-length": String(Buffer.byteLength(reversalBody)) }, body: reversalBody });
+    assert.equal(reversal.status, 503);
+    assert.match(JSON.parse(reversal.body).error, /inventory changes are disabled/i);
+  }
 });
 
 test("Supabase status never exposes server secrets", async () => {

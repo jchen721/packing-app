@@ -127,6 +127,20 @@
       <p id="historyMessage" role="status"></p>
     </section>
 
+    <section id="reversalSection" class="card" hidden>
+      <h2>Manager undo inventory transaction</h2>
+      <p class="note">This reverses the complete selected deduction or receipt and creates a new audit record. It never deletes the original history.</p>
+      <div class="actions">
+        <select id="reversalTransaction"><option value="">Choose a recent transaction</option></select>
+        <input id="reversalUser" placeholder="Manager name" autocomplete="name">
+        <input id="reversalReason" placeholder="Reason for undo">
+        <button id="previewReversal" type="button" class="secondary">Review Undo</button>
+      </div>
+      <div id="reversalPreview"></div>
+      <button id="confirmReversal" type="button" hidden>Confirm Inventory Undo</button>
+      <p id="reversalMessage" role="status"></p>
+    </section>
+
     <section class="card">
       <h2>Connections</h2>
       <div id="connectionStats" class="stats"></div>
@@ -139,6 +153,7 @@
     let currentBatchId = null;
     let inventoryItems = [];
     let receiptId = null;
+    let reversalTransactionId = null;
     let inventoryWritesEnabled = false;
 
     function setStatus(element, text, type = "") {
@@ -446,11 +461,77 @@
         if (!response.ok) throw new Error(data.error || "Could not load inventory history.");
         makeTable(document.getElementById("historyTable"), ["Time", "Item", "Category", "Change", "Previous", "New", "Action", "User"],
           data.history.map(row => [row.timestamp ? new Date(row.timestamp).toLocaleString() : "—", row.item, row.category, row.quantityChanged, row.previousQuantity, row.newQuantity, row.actionType, row.user]));
+        const reversed = new Set(data.history.filter(row => String(row.batchId || "").startsWith("reversal:")).map(row => String(row.batchId).slice("reversal:".length)));
+        const transactions = new Map();
+        for (const row of data.history) {
+          const id = String(row.batchId || "").trim();
+          const action = String(row.actionType || "").toUpperCase();
+          if (!id || reversed.has(id) || !["DEDUCTION", "RECEIVED"].includes(action) || transactions.has(id)) continue;
+          transactions.set(id, { id, action, timestamp: row.timestamp });
+        }
+        const select = document.getElementById("reversalTransaction");
+        select.replaceChildren();
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = transactions.size ? "Choose a recent transaction" : "No reversible recent transactions";
+        select.appendChild(placeholder);
+        for (const transaction of transactions.values()) {
+          const option = document.createElement("option");
+          option.value = transaction.id;
+          option.textContent = `${transaction.action} · ${transaction.id.slice(0, 16)}${transaction.id.length > 16 ? "…" : ""} · ${transaction.timestamp ? new Date(transaction.timestamp).toLocaleString() : ""}`;
+          select.appendChild(option);
+        }
         setStatus(message, `${data.history.length} recent inventory changes.`, "success");
       } catch (error) {
         setStatus(message, error.message, "error");
       }
     }
+
+    document.getElementById("previewReversal").addEventListener("click", async () => {
+      const message = document.getElementById("reversalMessage");
+      const transactionId = document.getElementById("reversalTransaction").value;
+      reversalTransactionId = null;
+      document.getElementById("confirmReversal").hidden = true;
+      if (!transactionId) return setStatus(message, "Choose an inventory transaction to undo.", "error");
+      setStatus(message, "Preparing inventory undo review…");
+      try {
+        const response = await fetch("/inventory/reversal/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transactionId }) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not review this inventory undo.");
+        reversalTransactionId = data.sourceTransactionId;
+        makeTable(document.getElementById("reversalPreview"), ["Item", "Current", "Undo change", "After"], data.changes.map(change => [change.item, change.previousQuantity, change.quantityChanged, change.newQuantity]));
+        document.getElementById("confirmReversal").disabled = false;
+        document.getElementById("confirmReversal").hidden = false;
+        setStatus(message, "Review every change, then confirm the complete transaction undo.", "success");
+      } catch (error) {
+        document.getElementById("reversalPreview").replaceChildren();
+        setStatus(message, error.message, "error");
+      }
+    });
+
+    document.getElementById("confirmReversal").addEventListener("click", async event => {
+      const message = document.getElementById("reversalMessage");
+      const user = document.getElementById("reversalUser").value.trim();
+      const reason = document.getElementById("reversalReason").value.trim();
+      if (!reversalTransactionId) return setStatus(message, "Review a transaction before confirming its undo.", "error");
+      if (!user || reason.length < 5) return setStatus(message, "Enter the manager name and a clear reason.", "error");
+      event.currentTarget.disabled = true;
+      setStatus(message, "Reversing inventory transaction…");
+      try {
+        const response = await fetch("/inventory/reversal/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transactionId: reversalTransactionId, user, reason }) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Inventory undo failed.");
+        reversalTransactionId = null;
+        event.currentTarget.disabled = false;
+        event.currentTarget.hidden = true;
+        document.getElementById("reversalPreview").replaceChildren();
+        setStatus(message, "Inventory transaction reversed and recorded.", "success");
+        await Promise.all([loadInventory(), loadHistory()]);
+      } catch (error) {
+        event.currentTarget.disabled = false;
+        setStatus(message, error.message, "error");
+      }
+    });
 
     async function loadConnections() {
       const message = document.getElementById("connectionMessage");
@@ -461,6 +542,7 @@
         inventoryWritesEnabled = data.inventoryWritesEnabled === true;
         document.getElementById("inventoryConfirmationControls").hidden = !inventoryWritesEnabled;
         document.getElementById("receiptSection").hidden = !inventoryWritesEnabled;
+        document.getElementById("reversalSection").hidden = !inventoryWritesEnabled;
         document.getElementById("operatingMode").textContent = inventoryWritesEnabled ? "Packing and box inventory mode" : "Packing-only mode";
         document.getElementById("operatingModeMessage").textContent = inventoryWritesEnabled
           ? "Confirmed packing runs update box inventory. Product quantities remain visible for picking but are not deducted in the current box-only phase."

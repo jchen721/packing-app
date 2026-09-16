@@ -12,6 +12,8 @@ const {
   readInventory,
   readInventoryHistory,
   readInventoryHistoryByTransactionId,
+  previewInventoryReversal,
+  reverseInventoryTransaction,
   appendInventoryReconciliationHistory,
   withInventoryLock,
   getSheetsClient,
@@ -310,6 +312,26 @@ app.get("/inventory-history", async (req, res) => {
     res.json({ history: await readInventoryHistory(req.query.limit) });
   } catch (error) {
     res.status(500).json({ error: `Could not load inventory history. ${error.message}` });
+  }
+});
+
+app.post("/inventory/reversal/preview", async (req, res) => {
+  try {
+    if (!config.inventoryWritesEnabled) return res.status(503).json({ error: "Inventory changes are disabled until the verified warehouse starting count is complete." });
+    res.json(await previewInventoryReversal(req.body.transactionId));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/inventory/reversal/confirm", async (req, res) => {
+  try {
+    if (!config.inventoryWritesEnabled) return res.status(503).json({ error: "Inventory changes are disabled until the verified warehouse starting count is complete." });
+    const result = await reverseInventoryTransaction(req.body);
+    const supabaseMirror = await safeSupabaseMirror(() => mirrorInventoryToSupabase());
+    res.json({ ...result, supabaseMirror });
+  } catch (error) {
+    res.status(/required|reason|valid|not found|already|only deduction|negative|verified/i.test(error.message) ? 400 : 500).json({ error: error.message });
   }
 });
 

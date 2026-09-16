@@ -9,6 +9,7 @@ This file records important behavioral and architectural decisions. It is not a 
 - Made approved box-only inventory mode the built-in default so a missing `.env` cannot silently disable warehouse deductions; an explicit `INVENTORY_WRITES_ENABLED=false` remains available as an emergency pause.
 - Kept numbered TikTok `BOX #` orders in `Needs_Review.pdf` while recording a separate audited estimate of one `7x5x5` box per verified order for confirmed supply deductions.
 - Added a controlled corrected-rerun authorization for the case where inventory was manually restored after a packing-rule correction. It supersedes only overlapping earlier order protections, requires manager acknowledgment, and keeps exact confirmed batches blocked.
+- Added a manager inventory-transaction undo with before/after review, shared locking, non-negative stock validation, rollback on history failure, immutable original records, and duplicate-reversal prevention.
 
 ## 2026-09-15
 
