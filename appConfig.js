@@ -87,7 +87,9 @@ module.exports = Object.freeze({
   packingStorageWarningBytes: boundedNumber(process.env.PACKING_STORAGE_WARNING_BYTES, 10 * 1024 ** 3, { min: 100 * 1024 ** 2, max: 10 * 1024 ** 4 }),
   minimumFreeDiskBytes: boundedNumber(process.env.MINIMUM_FREE_DISK_BYTES, 5 * 1024 ** 3, { min: 100 * 1024 ** 2, max: 10 * 1024 ** 4 }),
   operationRecoveryMinimumMinutes: boundedNumber(process.env.OPERATION_RECOVERY_MINIMUM_MINUTES, 15, { min: 5, max: 1440 }),
-  inventoryWritesEnabled: booleanSetting(process.env.INVENTORY_WRITES_ENABLED, false),
+  // The owner approved the live box-only rollout. An explicit false value can
+  // still pause writes, but a missing .env no longer forces packing-only mode.
+  inventoryWritesEnabled: booleanSetting(process.env.INVENTORY_WRITES_ENABLED, true),
   inventoryTrackingScope: resolveInventoryTrackingScope(process.env.INVENTORY_TRACKING_SCOPE, "boxes"),
   lowStockEmail,
   supabase

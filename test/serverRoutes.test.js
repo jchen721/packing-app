@@ -3,6 +3,9 @@ const assert = require("node:assert/strict");
 const { once } = require("node:events");
 const { Duplex } = require("node:stream");
 const { IncomingMessage, ServerResponse } = require("node:http");
+// The production default is live box-only mode. This file explicitly exercises
+// the emergency packing-only override and must set it before loading the app.
+process.env.INVENTORY_WRITES_ENABLED = "false";
 const app = require("../server");
 
 function decodeResponse(raw) {

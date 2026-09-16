@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { boundedNumber, booleanSetting, resolveInventoryTrackingScope, resolveLowStockEmailSettings, resolveSpreadsheetIds } = require("../appConfig");
+const { boundedNumber, booleanSetting, resolveInventoryTrackingScope, resolveLowStockEmailSettings, resolveSpreadsheetIds, inventoryWritesEnabled } = require("../appConfig");
 
 test("bounded numeric configuration rejects invalid and empty values", () => {
   assert.equal(boundedNumber("not-a-number", 15, { min: 5, max: 60 }), 15);
@@ -24,6 +24,10 @@ test("box-only inventory is the safe default tracking scope", () => {
   assert.equal(resolveInventoryTrackingScope(undefined), "boxes");
   assert.equal(resolveInventoryTrackingScope("ALL"), "all");
   assert.equal(resolveInventoryTrackingScope("unsupported"), "boxes");
+});
+
+test("confirmed box inventory writes stay enabled when .env is missing", () => {
+  assert.equal(inventoryWritesEnabled, true);
 });
 
 test("low-stock email stays disabled until every private setting is supplied", () => {

@@ -86,7 +86,7 @@ The warehouse rollout was explicitly approved on 2026-09-15. The safe environmen
 INVENTORY_WRITES_ENABLED=true
 ```
 
-The scope remains `boxes`, so Pokémon product inventory is not deducted. Uploading PDFs never changes inventory by itself; a user must explicitly confirm the reviewed batch. Machine-local `.env` files remain ignored by Git, and each computer must create its own from `.env.example`.
+The built-in default is now enabled with scope `boxes`, so a missing `.env` does not silently put a warehouse computer back into packing-only mode. Pokémon product inventory is not deducted. Uploading PDFs never changes inventory by itself; a user must explicitly confirm the reviewed batch. Machine-local `.env` files remain ignored by Git. Setting `INVENTORY_WRITES_ENABLED=false` remains an emergency pause switch.
 
 The first controlled inventory rollout is box-only. `Box Inventory` contains item, quantity, low-stock level, reorder amount, unit cost, and notes. Product quantities remain visible for picking and audit without being deducted. Blank box quantities mean a physical count is still required. Long 24-series products use 24x12x4 alone and 24x12x6 when one or more ETBs add height. The manager's current ETB ladder assigns four/five ETBs to 12x12x12 and six ETBs to 16x12x8; larger quantities require review.
 
@@ -114,7 +114,7 @@ Supabase is optional and currently serves as a mirror for structured operational
 ## Active application areas
 
 - **Packing:** PDF upload, parsing, verification, box selection, batch review, grouped PDFs, ZIP download, and proposed inventory usage.
-- **Inventory:** read current products and supplies; receipt and reconciliation endpoints exist but permanent writes are blocked while packing-only mode is active.
+- **Inventory:** read current products and supplies; confirmed box/supply deductions and existing-item receipts are active. Permanent writes can still be paused explicitly with `INVENTORY_WRITES_ENABLED=false`.
 - **Worker screen:** shows batch orders and records worker start/done/issue activity. It does not generate files or change inventory.
 
 Livestream analytics, TikTok synchronization, set building, forecasting, and AI tools are not active. Do not restore or expand them unless the owner starts a separate requested phase.
