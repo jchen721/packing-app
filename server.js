@@ -7,7 +7,7 @@ const config = require("./appConfig");
 const { processPDFs } = require("./pdfProcessor");
 const { readLogs, addWorkerLog, validateWorkerLog, buildWorkerLogForOrder } = require("./workerTracker");
 const { findBatch } = require("./batchService");
-const { previewDailyInventoryUpdate, confirmDailyInventoryUpdate } = require("./dailyInventoryUpdate");
+const { previewDailyInventoryUpdate, confirmDailyInventoryUpdate, authorizeCorrectedInventoryBatch } = require("./dailyInventoryUpdate");
 const {
   readInventory,
   readInventoryHistory,
@@ -279,6 +279,21 @@ app.post("/batches/:batchId/confirm", async (req, res) => {
     res.json({ ...result, lowStockEmail, supabaseMirror: { batch: batchMirror, inventory: inventoryMirror } });
   } catch (error) {
     res.status(/already/i.test(error.message) ? 409 : 500).json({ error: error.message });
+  }
+});
+
+app.post("/batches/:batchId/authorize-correction", async (req, res) => {
+  try {
+    if (!validBatchId(req.params.batchId)) return res.status(400).json({ error: "Invalid batch ID." });
+    if (!config.inventoryWritesEnabled) return res.status(503).json({ error: "Inventory changes are disabled until the verified warehouse starting count is complete." });
+    const user = String(req.body.user || "").trim();
+    if (!user) return res.status(400).json({ error: "Manager name is required." });
+    if (req.body.inventoryRestored !== true) return res.status(400).json({ error: "Confirm that the earlier inventory quantities were restored before authorizing a corrected rerun." });
+    const reconciliation = await inventoryReconciliationService.confirm({ user, reason: "Inventory restored before corrected packing rerun" });
+    const authorization = await authorizeCorrectedInventoryBatch(req.params.batchId, { user, inventoryRestored: true });
+    res.json({ ...authorization, reconciliation: { transactionId: reconciliation.transactionId, recordsWritten: reconciliation.recordsWritten } });
+  } catch (error) {
+    res.status(/required|confirm|no earlier|exact packing batch/i.test(error.message) ? 400 : 500).json({ error: error.message });
   }
 });
 

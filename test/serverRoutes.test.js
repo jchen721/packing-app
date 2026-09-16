@@ -67,6 +67,11 @@ test("packing-only mode blocks every permanent inventory mutation", async () => 
   assert.equal(confirmation.status, 503);
   assert.match(JSON.parse(confirmation.body).error, /inventory changes are disabled/i);
 
+  const correctionBody = JSON.stringify({ user: "QA", inventoryRestored: true });
+  const correction = await inject({ url: `/batches/${validBatch}/authorize-correction`, method: "POST", headers: { "content-type": "application/json", "content-length": String(Buffer.byteLength(correctionBody)) }, body: correctionBody });
+  assert.equal(correction.status, 503);
+  assert.match(JSON.parse(correction.body).error, /inventory changes are disabled/i);
+
   const receiptBody = JSON.stringify({ items: [{ item: "Test", quantity: 1 }], user: "QA" });
   const receipt = await inject({ url: "/inventory/receive/preview", method: "POST", headers: { "content-type": "application/json", "content-length": String(Buffer.byteLength(receiptBody)) }, body: receiptBody });
   assert.equal(receipt.status, 503);

@@ -45,6 +45,33 @@ function createGoogleBatchRegistry() {
     return rows.filter(row => wanted.has(row.orderKey) && row.status === "CONFIRMED").map(row => ({ orderKey: row.orderKey, batchId: row.batchId }));
   }
 
+  async function authorizeCorrectedBatch({ replacementBatchId, orderKeys, user }) {
+    const current = await readRows();
+    const wanted = new Set(orderKeys || []);
+    const targets = current.rows.filter(row => wanted.has(row.orderKey) && row.status === "CONFIRMED");
+    const priorAuthorizations = current.rows.filter(row => row.batchId === replacementBatchId && wanted.has(row.orderKey) && row.status === "CORRECTION_AUTHORIZED");
+    if (!targets.length && !priorAuthorizations.length) throw new Error("No confirmed shared packing records were found to supersede.");
+    const now = new Date().toISOString();
+    const attemptId = crypto.randomUUID();
+    const authorizedKeys = new Set(priorAuthorizations.map(row => row.orderKey));
+    const missingAuthorizations = targets.filter(row => !authorizedKeys.has(row.orderKey));
+    if (missingAuthorizations.length) {
+      await current.sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `'${SHEET_NAME}'!A:G`,
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: missingAuthorizations.map(row => [now, replacementBatchId, row.orderKey, "CORRECTION_AUTHORIZED", user, attemptId, now]) }
+      });
+    }
+    const updates = targets.flatMap(row => [
+      { range: `'${SHEET_NAME}'!D${row.rowNumber}`, values: [["SUPERSEDED"]] },
+      { range: `'${SHEET_NAME}'!G${row.rowNumber}`, values: [[now]] }
+    ]);
+    if (updates.length) await current.sheets.spreadsheets.values.batchUpdate({ spreadsheetId: SPREADSHEET_ID, requestBody: { valueInputOption: "RAW", data: updates } });
+    return { ordersSuperseded: targets.length || priorAuthorizations.length, attemptId: priorAuthorizations[0]?.attemptId || attemptId };
+  }
+
   async function reserve({ batchId, orderKeys, user }) {
     const sheets = await getSheetsClient(); await ensureSheet(sheets);
     const attemptId = crypto.randomUUID(); const now = new Date().toISOString();
@@ -104,7 +131,7 @@ function createGoogleBatchRegistry() {
     return { batchId: cleanBatchId, status: cleanStatus, rowsUpdated: targets.length, updatedAt: now, user: cleanUser };
   }
 
-  return { has, findProcessedOrders, reserve, markProcessed, release, listRecords, recoverBatchReservation };
+  return { has, findProcessedOrders, authorizeCorrectedBatch, reserve, markProcessed, release, listRecords, recoverBatchReservation };
 }
 
 module.exports = { SHEET_NAME, HEADERS, createGoogleBatchRegistry };

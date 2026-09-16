@@ -80,6 +80,8 @@ Each successful processing run creates a stable packing batch and stores audit m
 
 Uploading PDFs does not automatically deduct inventory. The manager reviews the batch's products, exact boxes, and proposed deductions before confirmation. Confirmation must prevent duplicate deductions and must not mark a batch completed if the authoritative Google Sheets transaction fails.
 
+When a packing rule is corrected after an earlier batch was already confirmed and the manager has manually restored the earlier inventory quantities, the review screen exposes a controlled corrected-rerun authorization. It requires a manager name and explicit restoration acknowledgment, marks the overlapping earlier order protections as `SUPERSEDED`, and retains an audit authorization in `Packing Batches`. This does not permit an exact already-confirmed batch to be confirmed again.
+
 The warehouse rollout was explicitly approved on 2026-09-15. The safe environment template now enables confirmed packing-supply deductions:
 
 ```env

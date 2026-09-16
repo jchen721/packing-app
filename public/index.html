@@ -73,6 +73,12 @@
       <h3>Current Google Sheets inventory check</h3>
       <div id="availability"></div>
       <p id="availabilityMessage" role="status"></p>
+      <div id="correctionControls" class="note" hidden>
+        <strong>Earlier confirmed orders detected</strong>
+        <p>Use this only when the earlier inventory deduction was manually restored and this is a corrected packing run.</p>
+        <label><input id="inventoryRestored" type="checkbox"> I confirm the earlier inventory quantities were restored.</label>
+        <div class="actions"><button id="authorizeCorrection" type="button" class="secondary">Authorize Corrected Rerun</button></div>
+      </div>
       <div class="actions">
         <a id="download" class="button secondary">Download Packing Files</a>
         <div id="inventoryConfirmationControls" class="actions" hidden>
@@ -214,8 +220,11 @@
       }
       document.getElementById("download").href = `/batches/${data.batchId}/download`;
       const confirm = document.getElementById("confirm");
+      const correctionRequired = !data.exactBatchProcessed && (data.duplicateOrders || []).length > 0;
       confirm.disabled = data.alreadyProcessed || data.inventoryReady === false;
       confirm.textContent = data.alreadyProcessed ? "Inventory Already Deducted" : data.inventoryReady === false ? "Resolve Inventory Issues" : "Confirm Inventory Deduction";
+      document.getElementById("correctionControls").hidden = !correctionRequired;
+      document.getElementById("inventoryRestored").checked = false;
       document.getElementById("review").hidden = false;
     }
 
@@ -270,6 +279,34 @@
         event.currentTarget.textContent = "Inventory Deducted";
         setStatus(message, "Inventory deduction confirmed and recorded.", "success");
         await Promise.all([loadBatches(), loadInventory(), loadHistory()]);
+      } catch (error) {
+        event.currentTarget.disabled = false;
+        setStatus(message, error.message, "error");
+      }
+    });
+
+    document.getElementById("authorizeCorrection").addEventListener("click", async event => {
+      const user = document.getElementById("confirmationUser").value.trim();
+      const inventoryRestored = document.getElementById("inventoryRestored").checked;
+      const message = document.getElementById("packingMessage");
+      if (!user) return setStatus(message, "Enter the manager's name before authorizing the corrected rerun.", "error");
+      if (!inventoryRestored) return setStatus(message, "Confirm that the earlier inventory quantities were restored.", "error");
+      event.currentTarget.disabled = true;
+      setStatus(message, "Authorizing corrected rerun…");
+      try {
+        const response = await fetch(`/batches/${currentBatchId}/authorize-correction`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user, inventoryRestored })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Corrected rerun authorization failed.");
+        const reviewResponse = await fetch(`/batches/${currentBatchId}`);
+        const review = await reviewResponse.json();
+        if (!reviewResponse.ok) throw new Error(review.error || "Could not refresh the batch review.");
+        renderReview(review);
+        setStatus(message, `${result.ordersAuthorized} earlier order record(s) superseded. Review and confirm this corrected deduction.`, "success");
+        await loadBatches();
       } catch (error) {
         event.currentTarget.disabled = false;
         setStatus(message, error.message, "error");

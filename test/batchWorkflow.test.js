@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { createBatchManifest, saveBatchFiles, findBatch } = require("../batchService");
-const { createConfirmationService, selectTrackedInventoryUsage, validateResolvedBoxUsage } = require("../dailyInventoryUpdate");
+const { createLocalBatchRegistry, createConfirmationService, selectTrackedInventoryUsage, validateResolvedBoxUsage } = require("../dailyInventoryUpdate");
 
 function sampleOrders() {
   return [{ sourceFile: "orders.pdf", orderId: "100", trackingNumber: "200", finalGroup: "8x8x4", exactPackingGroup: "8x8x4", products: [
@@ -152,6 +152,41 @@ test("an order reused inside a different batch is prevented", async () => {
   const service = createConfirmationService({ outputsDir: fixture.outputsDir, registry, inventoryGateway: { async subtractInventory() { calls++; } } });
   await assert.rejects(service.confirm(fixture.manifest.batch.batchId, { user: "Alice" }), /already deducted.*100/);
   assert.equal(calls, 0);
+});
+
+test("manager can authorize a corrected rerun only after inventory restoration", async () => {
+  const fixture = makeBatch();
+  let authorization;
+  const registry = {
+    has() { return false; },
+    findProcessedOrders() { return [{ orderKey: "order:100", batchId: "older-batch" }]; },
+    authorizeCorrectedBatch(record) { authorization = record; return { ordersSuperseded: 1 }; }
+  };
+  const service = createConfirmationService({ outputsDir: fixture.outputsDir, registry, inventoryGateway: {} });
+  await assert.rejects(service.authorizeCorrection(fixture.manifest.batch.batchId, { user: "Manager" }), /inventory quantities were restored/i);
+  const result = await service.authorizeCorrection(fixture.manifest.batch.batchId, { user: "Manager", inventoryRestored: true });
+  assert.equal(result.ordersAuthorized, 1);
+  assert.equal(authorization.replacementBatchId, fixture.manifest.batch.batchId);
+  assert.deepEqual(authorization.orderKeys, ["order:100"]);
+});
+
+test("local corrected-rerun authorization preserves audit and releases only matching order protection", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "packing-registry-test-"));
+  const registryPath = path.join(root, "processed.json");
+  fs.writeFileSync(registryPath, JSON.stringify([{ batchId: "old", orderKeys: ["order:100", "order:200"] }], null, 2));
+  const registry = createLocalBatchRegistry(registryPath);
+  registry.authorizeCorrectedBatch({ replacementBatchId: "new", orderKeys: ["order:100"], user: "Manager", reason: "Restored" });
+  assert.deepEqual(registry.findProcessedOrders(["order:100", "order:200"]), [{ orderKey: "order:200", batchId: "old" }]);
+  const saved = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+  assert.deepEqual(saved[0].supersessions[0].orderKeys, ["order:100"]);
+  assert.equal(saved[0].supersessions[0].authorizedBy, "Manager");
+});
+
+test("an exact confirmed batch cannot be authorized as a corrected rerun", async () => {
+  const fixture = makeBatch();
+  const registry = { has() { return true; } };
+  const service = createConfirmationService({ outputsDir: fixture.outputsDir, registry, inventoryGateway: {} });
+  await assert.rejects(service.authorizeCorrection(fixture.manifest.batch.batchId, { user: "Manager", inventoryRestored: true }), /exact packing batch was already deducted/i);
 });
 
 test("failed inventory confirmation never marks the batch processed", async () => {
