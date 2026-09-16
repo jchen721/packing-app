@@ -91,7 +91,7 @@ test("existing box selection rules remain intact", () => {
 test("manager ETB and poster ladder uses the new exact box sizes", () => {
   assert.equal(chooseBox(counts({ etbs: 2, boosterBundles: 1 })), "11x11x7");
   assert.equal(chooseBox(counts({ etbs: 3 })), "11x11x7");
-  assert.equal(chooseBox(counts({ posters: 1 })), "11x11x3");
+  assert.equal(chooseBox(counts({ posters: 1 })), "11x11x5");
   assert.equal(chooseBox(counts({ posters: 2 })), "11x11x5");
   assert.equal(chooseBox(counts({ posters: 1, etbs: 1 })), "11x11x5");
   assert.equal(chooseBox(counts({ posters: 2, etbs: 1 })), "11x11x7");

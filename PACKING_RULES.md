@@ -1796,7 +1796,7 @@ These newer rules replace older rules wherever they conflict:
 
 4. The current poster ladder is:
 
-- 1 poster -> `11x11x3`
+- 1 poster -> `11x11x5` (`11x11x3` was eliminated by the warehouse)
 - 2 posters -> `11x11x5`
 - 1 poster + 1 ETB -> `11x11x5`
 - 2 posters + 1 ETB -> `11x11x7`
@@ -1827,3 +1827,5 @@ Unlisted collection quantities and mixed large-product combinations remain `Need
 8. First Partner Series 2 and First Partner Series 3 use the existing Pokémon Day packing behavior. More than one First Partner collection is no longer a reason by itself for `Needs Review`: without an ETB the order uses `8x8x4`; with one ETB it uses `8x8x8`; with two ETBs it uses `11x11x5`. Small packs, tins, and Booster Bundles do not by themselves increase this established box.
 
 9. `Legendary Warriors Premium Collection` and `Unova Premium Collection - Heavy Hitters` are the same long physical family as Blooming Waters. They use `24x12x4` without an ETB and `24x12x6` when one or more ETBs add height. Multiple items from this approved 24-series family continue to receive one exact 24-series classification because the owner requires one box classification per order.
+
+10. The manager's earlier note `1 poster // eliminate` means eliminate the `11x11x3` box, not assign it. A single poster uses `11x11x5`. Batches generated before this correction that contain `11x11x3` must not be confirmed; reprocess their source PDFs so the corrected exact box is stored in the new batch.

@@ -2,6 +2,11 @@
 
 This file records important behavioral and architectural decisions. It is not a replacement for Git history.
 
+## 2026-09-16
+
+- Corrected the manager's `1 poster // eliminate` instruction: `11x11x3` is not stocked, and a single poster now uses `11x11x5`.
+- Kept the retired `11x11x3` inventory mapping only to block stale batches safely; affected PDFs must be reprocessed before confirmation.
+
 ## 2026-09-15
 
 - Prepared the first box-only inventory rollout without enabling permanent writes.

@@ -74,6 +74,8 @@ const BOX_GROUP_MAP = {
   "7x5x5": "7x5x5 Boxes",
   "8x8x4": "8x8x4 Boxes",
   "8x8x8": "8x8x8 Boxes",
+  // Retained for stale pre-correction batches so they remain blocked rather
+  // than silently confirming without a physical box deduction.
   "11x11x3": "11x11x3 Boxes",
   "11x11x5": "11x11x5 Boxes",
   "11x11x7": "11x11x7 Boxes",

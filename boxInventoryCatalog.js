@@ -14,7 +14,7 @@ const BOX_CATALOG = Object.freeze([
   { item: "7x5x5 Boxes", unitCost: 0.29 },
   { item: "8x8x4 Boxes", unitCost: 0.50 },
   { item: "8x8x8 Boxes", unitCost: 0.48 },
-  { item: "11x11x3 Boxes", unitCost: "", notes: "Starting quantity not yet provided." },
+  { item: "11x11x3 Boxes", unitCost: "", notes: "Eliminated by the warehouse; retained only so stale batches cannot silently skip this supply." },
   { item: "11x11x5 Boxes", unitCost: 1.02 },
   { item: "11x11x7 Boxes", unitCost: 1.12 },
   { item: "11x11x9 Boxes", unitCost: 1.17 },

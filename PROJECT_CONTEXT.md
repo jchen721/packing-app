@@ -152,13 +152,13 @@ Known current facts as of 2026-08-27:
 
 ### Manager box chart update — 2026-09-15
 
-The newest manager chart supersedes the older generic ETB/poster ladder where the two conflict. One poster uses `11x11x3`; two posters or one poster plus one ETB use `11x11x5`; two posters plus one ETB and two ETBs plus a Booster Bundle use `11x11x7`; three ETBs plus a poster use `11x11x9`; four or five ETBs use `12x12x12`; and six ETBs use `16x12x8`. Seven or more ETBs remain `Needs Review`.
+The newest manager chart supersedes the older generic ETB/poster ladder where the two conflict. The warehouse eliminated `11x11x3`, so one poster, two posters, or one poster plus one ETB use `11x11x5`; two posters plus one ETB and two ETBs plus a Booster Bundle use `11x11x7`; three ETBs plus a poster use `11x11x9`; four or five ETBs use `12x12x12`; and six ETBs use `16x12x8`. Seven or more ETBs remain `Needs Review`.
 
 One Japanese/JP Booster Box uses `8x8x4`; the existing one-box `7x5x5` rule remains for other standard Booster Boxes. Generic collection boxes use their approved collection ladder, while named physical exceptions such as Blooming Waters, First Partner, Mega-family, and other existing special products retain their established categories. The legacy `8x6x4` result is treated as the replacement `6x6x6` supply.
 
 First Partner Series 2 and Series 3 use the existing Pokémon Day behavior, including quantities greater than one: without an ETB they remain in `8x8x4`, and the established Pokémon Day + ETB combination rules still apply. `Legendary Warriors Premium Collection` and `Unova Premium Collection - Heavy Hitters` are explicitly approved as the same long 24-series physical family as Blooming Waters.
 
-`12x12x12` remains consolidated into `11_Box.pdf` so this new exact supply estimate does not add another worker-facing PDF. Exact `11x11x3`, `12x12x12`, and `16x12x12` decisions are retained in batch manifests and inventory usage.
+`12x12x12` remains consolidated into `11_Box.pdf` so this new exact supply estimate does not add another worker-facing PDF. Exact `12x12x12` and `16x12x12` decisions are retained in batch manifests and inventory usage. The old `11x11x3` mapping remains only as a safety block for stale batches created before the correction; those PDFs must be reprocessed.
 
 ## Future supply forecasting requirement
 

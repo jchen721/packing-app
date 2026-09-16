@@ -213,7 +213,8 @@ function cleanText(text) {
       if (etbs === 1 && posters === 2) return "11x11x7";
       if (etbs === 1 && posters === 1) return "11x11x5";
       if (etbs === 0 && posters === 2) return "11x11x5";
-      if (etbs === 0 && posters === 1) return "11x11x3";
+      // The warehouse eliminated 11x11x3; one poster uses 11x11x5.
+      if (etbs === 0 && posters === 1) return "11x11x5";
       return "Needs Review";
     }
   
