@@ -2,7 +2,7 @@
   "name": "packing-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Ace Collectibles packing and inventory application",
+  "description": "Production-oriented warehouse PDF packing, inventory, and audit platform",
   "main": "server.js",
   "scripts": {
     "test": "node --test test/*.test.js",
@@ -18,6 +18,9 @@
   "keywords": [
     "packing",
     "inventory",
+    "warehouse-automation",
+    "pdf-processing",
+    "google-sheets",
     "operations"
   ],
   "author": "",

@@ -2,6 +2,12 @@
 
 This file records important behavioral and architectural decisions. It is not a replacement for Git history.
 
+## 2026-10-19
+
+- Reworked the repository README into a recruiter-facing product and engineering overview without exposing customer PDFs, credentials, generated outputs, or live warehouse data.
+- Added architecture documentation covering component boundaries, transaction sequencing, duplicate protection, reversal semantics, storage boundaries, and deliberate engineering tradeoffs.
+- Added GitHub Actions CI so every push and pull request runs syntax validation and the complete automated test suite on Node.js 24.
+
 ## 2026-09-16
 
 - Corrected the manager's `1 poster // eliminate` instruction: `11x11x3` is not stocked, and a single poster now uses `11x11x5`.

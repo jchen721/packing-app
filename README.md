@@ -1,95 +1,202 @@
-# Ace Collectibles Packing & Inventory
+# Ace Collectibles Packing & Inventory Platform
 
-This application now has two active manager areas:
+[![CI](https://github.com/jchen721/packing-app/actions/workflows/ci.yml/badge.svg)](https://github.com/jchen721/packing-app/actions/workflows/ci.yml)
+![Node.js](https://img.shields.io/badge/Node.js-24%2B-339933?logo=node.js&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-133%20passing-brightgreen)
 
-1. **Packing** — upload order PDFs, extract and verify orders, select box sizes, generate grouped PDFs and a ZIP, update the packing list, review the exact inventory usage, and explicitly confirm deductions.
-2. **Inventory** — read current Pokémon products and warehouse supplies from Google Sheets, receive existing catalog items with confirmation, and view recent inventory changes.
+A production-oriented warehouse operations application that converts large order-PDF batches into verified, worker-ready packing files and auditable inventory transactions.
 
-The worker packing screen remains available at `/worker.html` and continues to record shared packing activity.
+This project began as a PDF sorter and evolved into a shared packing and inventory platform used across a macOS development machine and a Windows warehouse computer. It demonstrates workflow automation, PDF parsing, deterministic business rules, distributed duplicate protection, transactional Google Sheets updates, audit history, and failure-safe recovery.
 
-By default the application starts in **packing-only mode**. PDF processing, grouped packing files, ZIP generation, packing-list updates, batch manifests, and worker tracking remain active, while permanent inventory additions, deductions, receipts, and reconciliations are blocked at the server.
+> Customer PDFs, generated outputs, service-account credentials, environment files, and live operational data are intentionally excluded from this repository.
 
-Keep this setting until the verified warehouse starting count is complete:
+## What the system does
 
-```env
-INVENTORY_WRITES_ENABLED=false
+```mermaid
+flowchart LR
+    A[Upload order PDFs] --> B[Parse labels, slips, products, and quantities]
+    B --> C[Select exact physical box]
+    C --> D[Group and sort worker PDFs]
+    D --> E[Verify every input and output page]
+    E --> F[Create audited packing batch]
+    F --> G[Manager reviews proposed deductions]
+    G --> H[Explicit confirmation]
+    H --> I[Google Sheets inventory and history]
 ```
 
-After the starting count and a controlled confirmation test, set it to `true` and restart the server.
+### Packing automation
 
-Livestream analytics, TikTok synchronization, set planning, forecasting, product research, and AI tools are not active. Their pre-simplification source is recoverable from the dated checkpoint in `.checkpoints/` if Ace chooses to revisit them.
+- Processes multiple order PDFs in one run.
+- Supports multiple packing-slip formats and physical quantity multipliers.
+- Preserves shipping-label and packing-slip pairing.
+- Selects exact physical boxes through deterministic product-type and quantity rules.
+- Consolidates exact sizes into a smaller worker-friendly PDF set.
+- Sorts orders by Buyer Nickname, falling back to Buyer ID.
+- Generates a printable ZIP containing PDFs only—never private audit JSON.
+- Routes unsupported combinations to `Needs Review` rather than guessing.
 
-## Source of truth
+### Verification and auditability
 
-Google Sheets remains the editable source of truth for current inventory:
+- Verifies expected page counts and detects missing or duplicate output pages.
+- Refuses to update the picking checklist when verification fails.
+- Creates a stable packing batch ID and immutable run manifests.
+- Stores the exact order, grouping, verification, summary, and inventory-usage data required to audit a run.
+- Removes temporary uploaded PDFs after processing.
 
-- `Inventory`
-- `Warehouse Supplies`
-- `packing List`
-- `Packing Batches`
-- `Packing Activity`
-- `Inventory History`
-- `Inventory Locks`
+### Inventory operations
 
-The manager interface intentionally does not edit catalog names or starting quantities. Add or correct those directly in the appropriate Google Sheet tab. Confirmed packing deductions and confirmed receipts create Inventory History records automatically.
+- Uses Google Sheets as the editable operational source of truth.
+- Shows current quantity, proposed change, and resulting quantity before confirmation.
+- Deducts packing supplies only after explicit manager confirmation.
+- Receives existing inventory items through a preview-and-confirm workflow.
+- Records every movement with timestamp, transaction ID, before/after quantities, reason, and user.
+- Supports audited manager reversal of complete deduction or receipt transactions.
+- Detects direct spreadsheet quantity edits and records reconciliation history.
+- Optionally sends Gmail low-stock alerts when a confirmed deduction crosses a threshold.
 
-Supabase can retain a shared mirror of inventory, inventory history, packing batches, orders, and worker activity. Google Sheets is still updated first. Supabase PDF/ZIP storage should remain disabled when Supabase is used for records only.
+### Multi-computer safety
 
-## Configuration
+- Shared `Packing Batches` records prevent repeated deductions across computers.
+- Shared inventory locks serialize deductions, receipts, reversals, and corrections.
+- Local audit records provide a fallback without replacing shared protection.
+- A controlled corrected-rerun workflow handles rule corrections after inventory has been manually restored.
+- Google Sheets must succeed before a batch is marked confirmed.
 
-Copy `.env.example` to `.env` and configure the existing values without committing credentials.
+### Worker tools
 
-Important settings:
+- A separate worker screen displays batch orders.
+- Workers can record start, completion, and issue events.
+- Activity includes worker, order, buyer, packing group, and timestamp.
+- Worker actions never mutate inventory.
 
-| Setting | Purpose |
+## Engineering highlights
+
+| Area | Implementation |
 | --- | --- |
-| `GOOGLE_SPREADSHEET_ID` | Operations spreadsheet |
-| `GOOGLE_CREDENTIALS_FILE` | Server-only Google service-account file |
-| `PORT` / `HOST` | Local server address |
-| `MAX_UPLOAD_FILES` | Maximum PDFs in one processing request |
-| `SUPABASE_*` | Optional shared record mirror |
+| PDF pipeline | `pdf-parse` extraction, `pdf-lib` assembly, label/slip pairing, page verification |
+| Box engine | Deterministic product classification and quantity-aware packing rules |
+| Backend | Node.js 24+, Express 5, Multer uploads |
+| Shared operations | Google Sheets API with schema validation and shared locks |
+| Audit model | Stable batch IDs, per-run manifests, immutable inventory history |
+| Duplicate protection | Batch-level and order-level protection across computers |
+| Optional persistence | Supabase structured-record mirror with Google Sheets remaining primary |
+| Notifications | Nodemailer/Gmail low-stock alerts |
+| Quality | 133 automated tests plus syntax and unsafe-interface checks |
+| Security | Server-only credentials, ignored private data, safe DOM rendering, upload cleanup |
 
-Keep these values for record-only Supabase use:
+See [System Architecture](docs/ARCHITECTURE.md) for component boundaries, transaction guarantees, and design tradeoffs.
 
-```env
-SUPABASE_DATABASE_MIRROR_ENABLED=true
-SUPABASE_STORAGE_MIRROR_ENABLED=false
-SUPABASE_AUTH_ENABLED=false
-```
+## Worker-facing output
 
-Never place a Google private key or Supabase secret in browser JavaScript or commit it to Git.
+The rules engine preserves exact physical box decisions internally while consolidating output into a manageable set of files:
 
-## Run
+- `6_Box.pdf`
+- `8x8x4.pdf`
+- `8x8x8.pdf`
+- `11_Box.pdf`
+- `13_Box.pdf`
+- `16_Box.pdf`
+- `24_Box.pdf`
+- `Packs_Only.pdf`
+- `Sleeved_Packs.pdf`
+- `Needs_Review.pdf`
+
+This separates operational precision from worker simplicity: the inventory system retains exact box usage while warehouse staff handle fewer print groups.
+
+## Shared Google Sheets model
+
+| Tab | Responsibility |
+| --- | --- |
+| `Inventory` | Pokémon product catalog and current quantities |
+| `Box Inventory` | Packing supplies, thresholds, reorder amounts, and unit costs |
+| `packing List` | Physical picking totals and worker checklist |
+| `Packing Batches` | Cross-computer duplicate protection and batch state |
+| `Packing Activity` | Worker start, completion, and issue events |
+| `Inventory History` | Immutable deductions, receipts, corrections, and reversals |
+| `Inventory Locks` | Shared serialization of inventory mutations |
+
+The current controlled rollout automatically deducts packing supplies. Pokémon product quantities remain visible for picking and audit but are not automatically deducted.
+
+## Local setup
+
+### Requirements
+
+- Node.js 24 or newer
+- A Google Cloud service account with access to a dedicated operations spreadsheet
+- Optional Supabase project for structured-record mirroring
+- Optional Gmail app password for low-stock notifications
+
+### Install
 
 ```bash
+git clone git@github.com:jchen721/packing-app.git
+cd packing-app
 npm install
-npm run check
-npm test
-npm start
+cp .env.example .env
 ```
 
-Open `http://127.0.0.1:3000/`.
+Populate `.env` locally. Never commit `.env`, Google credentials, or Supabase secrets.
 
-Validate or safely create only the required packing/inventory Sheet tabs:
+Validate or create the required spreadsheet schema:
 
 ```bash
 npm run setup:sheets
 ```
 
-Verify and synchronize the optional Supabase record mirror:
+Start the application:
 
 ```bash
-npm run check:supabase
-npm run sync:supabase
+npm start
 ```
 
-## Packing safety
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000).
 
-- Uploaded temporary PDFs are removed after processing.
-- Downloaded worker ZIPs contain only the grouped PDFs that need to be printed; audit JSON remains in the private batch run directory.
-- Every run saves batch manifests inside its output directory.
-- Inventory is never deducted automatically after upload.
-- Confirmation validates current Google Sheets quantities.
-- Stable batch and order records prevent repeated deductions across computers.
-- Google Sheets must succeed before a batch is marked confirmed.
-- Supabase mirror failures do not undo a successful Google Sheets transaction; the mirror can be synchronized again.
+## Quality checks
+
+```bash
+npm run check
+npm test
+```
+
+The test suite covers box selection, PDF grouping, verification, inventory usage, receipts, reconciliation, transaction reversal, duplicate confirmation prevention, recovery behavior, worker tracking, Google Sheets schema compatibility, Supabase compatibility, storage safety, and unsafe DOM-sink prevention.
+
+GitHub Actions runs the same checks on every push and pull request.
+
+## Operational deployment
+
+Application code is distributed through GitHub. Shared warehouse state lives in Google Sheets.
+
+```text
+macOS development machine ── git push ──> GitHub
+                                              │
+                                              └── git pull ──> Windows warehouse computer
+
+Both computers ───────────── shared operations ─────────────> Google Sheets
+```
+
+Machine-local `.env` and Google credential files are installed separately and never travel through Git.
+
+## Safety boundaries
+
+- Uploading PDFs never deducts inventory automatically.
+- Unknown product combinations remain in `Needs Review`.
+- Exact duplicate confirmations are blocked.
+- Inventory history is append-only; undo creates a new reversal record.
+- Failed history writes trigger quantity rollback.
+- Uncertain shared operations are left for manual review instead of being silently retried.
+- Supabase is an optional mirror; Google Sheets is updated first.
+- Product aliases are manager-approved before they affect operational totals.
+
+## Current scope
+
+Active areas are packing automation, packing-supply inventory, receiving, transaction history and undo, worker tracking, low-stock notification support, and optional Supabase mirroring.
+
+Livestream analytics, TikTok API integration, AI set building, and inventory forecasting were intentionally postponed so the warehouse could deploy a smaller and safer operational core first.
+
+## Project documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Packing rules](PACKING_RULES.md)
+- [Project context](PROJECT_CONTEXT.md)
+- [Change log](CHANGELOG.md)
+- [Repository safeguards](AGENTS.md)
